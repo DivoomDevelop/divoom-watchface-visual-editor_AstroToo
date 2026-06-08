@@ -39,7 +39,15 @@ import {
   savePendingTemplateCacheToStorage
 } from "./pendingTemplateCache.js";
 import {
+  buildSimulatedLanDeviceList,
+  getSimulatedDeviceId,
+  isSimulatedDeviceMode
+} from "./simulatedDevice.js";
+import {
+  classifyCatalogNeedsNameEnrichment,
   downloadSingleTemplateToLocal,
+  enrichClassifyCatalogNames,
+  fetchBilingualClassifyNameIndex,
   mergeClassifyCatalogSnapshots,
   pickSyncLanguage,
   scanPendingTemplatesFromDevice
@@ -600,7 +608,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         clockid: [1109, 1472, 1125, 1126, 1426, 1427, 1428, 1429, 1430, 1431, 1473, 1474, 1475, 1476, 1124, 1123, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1122, 1477]
       }
     ],
-    DeviceId: 300344410,
+    DeviceId: 300396998,
     PacketFlag: 1745214910
   });
 
@@ -2255,6 +2263,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     tickHandle: null
   };
 
+  /** AstroToo 固定方形逻辑分辨率；加载模板/配置时始终回到此尺寸。 */
+  function syncEditorCanvasDimensions() {
+    state.width = EDITOR_CANVAS_WIDTH;
+    state.height = EDITOR_CANVAS_HEIGHT;
+  }
+
   let photoAlbumDemoImages = [];
   const photoAlbumPreviewItemState = new WeakMap();
 
@@ -2987,6 +3001,21 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return templateState.classifyRows[0] || null;
   }
 
+  function findTemplateClassifyMeta(classifyId) {
+    const cid = toNum(classifyId, NaN);
+    if (!Number.isFinite(cid)) return null;
+    const pools = [
+      templateState.classifyRows,
+      pendingTemplateState.classifyRows,
+      Array.isArray(getTemplateClassifyData()?.ClassifyList) ? getTemplateClassifyData().ClassifyList : []
+    ];
+    for (const list of pools) {
+      const row = list.find((item) => Number(item?.ClassifyId) === cid);
+      if (row) return row;
+    }
+    return null;
+  }
+
   function refreshTemplateCategorySelectorUi() {
     syncTemplateDomRefs();
     const previousSelected = toNum(templateState.selectedClassifyId, NaN);
@@ -3176,7 +3205,14 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   /** 顶部下拉是否已选具体设备（`value=""` 占位符视为未选）。 */
   function isLanDeviceSelectedInUi() {
+    if (isSimulatedDeviceMode()) return getSimulatedDeviceId() > 0;
     return Boolean(dom.selectLanDevice && String(dom.selectLanDevice.value || "").trim());
+  }
+
+  /** 是否可向真实 LAN 设备发 HTTP（仿真模式仅商店 API，不走设备 HTTP）。 */
+  function hasLanDeviceHttpTarget() {
+    if (isSimulatedDeviceMode()) return false;
+    return Boolean(getLanTargetBase());
   }
 
   function refreshLanActionButtons() {
@@ -3192,6 +3228,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       return;
     }
     if (!hasLanDevice) {
+      if (applyBtn) applyBtn.disabled = true;
+      if (createBtn) createBtn.disabled = true;
+      if (showClockBtn) {
+        showClockBtn.hidden = !hasClockId;
+        showClockBtn.disabled = true;
+      }
+      return;
+    }
+    if (!hasLanDeviceHttpTarget()) {
       if (applyBtn) applyBtn.disabled = true;
       if (createBtn) createBtn.disabled = true;
       if (showClockBtn) {
@@ -3684,8 +3729,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       }
     }
     state.previewTextOverrides = new Map(Object.entries(rec.previewOverrides || {}));
-    state.width = clamp(toNum(rec.width, EDITOR_CANVAS_WIDTH), 64, 4000);
-    state.height = clamp(toNum(rec.height, EDITOR_CANVAS_HEIGHT), 64, 4000);
+    syncEditorCanvasDimensions();
     state.zoom = clamp(toNum(rec.zoom, 55), 20, 220);
     if (dom.inputZoom) dom.inputZoom.value = String(state.zoom);
     if (dom.txtZoom) dom.txtZoom.textContent = `${Math.round(state.zoom)}%`;
@@ -3824,8 +3868,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       backgroundDataUrl: src.backgroundDataUrl || "",
       backgroundName: src.backgroundName || "",
       backgroundSourceLabel: src.backgroundSourceLabel || "",
-      width: src.width ?? EDITOR_CANVAS_WIDTH,
-      height: src.height ?? EDITOR_CANVAS_HEIGHT,
+      width: EDITOR_CANVAS_WIDTH,
+      height: EDITOR_CANVAS_HEIGHT,
       zoom: src.zoom ?? 55,
       previewOverrides: src.previewOverrides ? JSON.parse(JSON.stringify(src.previewOverrides)) : {},
       templateActiveClockId: src.templateActiveClockId != null ? src.templateActiveClockId : null
@@ -3956,6 +4000,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   function resolveSelectedLanDeviceId() {
+    if (isSimulatedDeviceMode()) return getSimulatedDeviceId();
     const id = dom.selectLanDevice?.value;
     if (!id) return 0;
     const row = lanDeviceRowsById.get(String(id));
@@ -3964,6 +4009,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   /** 表盘商店 API 用 DeviceId（来自 LAN 选择或本地记录，不要求设备 HTTP 可达）。 */
   function resolveStoreApiDeviceId() {
+    if (isSimulatedDeviceMode()) return getSimulatedDeviceId();
     const fromUi = resolveSelectedLanDeviceId();
     if (fromUi > 0) return fromUi;
     try {
@@ -4098,15 +4144,28 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     );
   }
 
+  async function enrichTemplateClassifyNamesFromStore(catalog) {
+    if (!catalog || !classifyCatalogNeedsNameEnrichment(catalog)) return catalog;
+    if (!resolveStoreApiDeviceId()) return catalog;
+    try {
+      const nameIndex = await fetchBilingualClassifyNameIndex(divoomStoreJson);
+      return enrichClassifyCatalogNames(catalog, nameIndex);
+    } catch {
+      return catalog;
+    }
+  }
+
   async function loadTemplateClassifyCache() {
     try {
       const data = await fetchJson(TEMPLATE_CLASSIFY_CACHE_PATH);
-      const merged = mergeClassifyCatalogSnapshots(TEMPLATE_CLASSIFY_FALLBACK, data);
+      let merged = mergeClassifyCatalogSnapshots(TEMPLATE_CLASSIFY_FALLBACK, data);
+      merged = await enrichTemplateClassifyNamesFromStore(merged);
       setTemplateClassifyDataRuntime(merged);
-      if (
+      const shouldRewriteDisk =
+        classifyCatalogNeedsNameEnrichment(data) ||
         countClassifyCatalogClockIds(data) <
-        countClassifyCatalogClockIds(TEMPLATE_CLASSIFY_FALLBACK) * 0.9
-      ) {
+          countClassifyCatalogClockIds(TEMPLATE_CLASSIFY_FALLBACK) * 0.9;
+      if (shouldRewriteDisk) {
         try {
           if (await isDevSyncApiAvailable()) {
             await saveClassifyCacheViaApi(merged);
@@ -4390,7 +4449,11 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const item = getPendingItemByClockId(id);
     if (!item || item.status === "installed") return;
 
-    if (!getLanTargetBase() || !isLanDeviceSelectedInUi()) {
+    if (!isLanDeviceSelectedInUi()) {
+      alert(t("template.sync.needDeviceId"));
+      return;
+    }
+    if (!isSimulatedDeviceMode() && !getLanTargetBase()) {
       alert(t("template.sync.needDevice"));
       return;
     }
@@ -4408,11 +4471,14 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     openTemplateDownloadProgressDialog(t("template.pending.downloadingTitle", { name: title }));
 
     try {
+      const classifyMeta = findTemplateClassifyMeta(item.classifyId);
       const result = await downloadSingleTemplateToLocal({
         storeJson: divoomStoreJson,
-        divoomJson,
+        divoomJson: isSimulatedDeviceMode() ? divoomStoreJson : divoomJson,
         clockId: id,
         classifyId: item.classifyId,
+        classifyName: classifyMeta?.ClassifyName,
+        classifyNameEn: classifyMeta?.ClassifyNameEn,
         getSlotByItem: getTemplateSlotByItem,
         isImageItem: isTemplateImageItem,
         loadFontInfo: loadFontInfoJsonForSync,
@@ -4430,7 +4496,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       });
 
       item.status = "installed";
-      setTemplateClassifyDataRuntime(result.classifyCache);
+      const enrichedCache = await enrichTemplateClassifyNamesFromStore(result.classifyCache);
+      setTemplateClassifyDataRuntime(enrichedCache);
       await loadTemplateClassifyCache();
       await loadTemplateConfigIds();
       await loadDefaultFontConfigs();
@@ -6050,23 +6117,28 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (!sel) return;
     if (btn) btn.disabled = true;
     try {
-      const url = resolveSameLanDeviceListUrl();
-      const res = await fetch(url, { method: "GET", credentials: "omit", cache: "no-store" });
-      const text = await res.text();
-      let data = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        /* ignore */
+      let filtered;
+      if (isSimulatedDeviceMode()) {
+        filtered = buildSimulatedLanDeviceList();
+      } else {
+        const url = resolveSameLanDeviceListUrl();
+        const res = await fetch(url, { method: "GET", credentials: "omit", cache: "no-store" });
+        const text = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          /* ignore */
+        }
+        if (!res.ok) {
+          throw new Error(text.slice(0, 240) || String(res.status));
+        }
+        if (data && data.ReturnCode !== undefined && Number(data.ReturnCode) !== 0) {
+          throw new Error(String(data.ReturnMessage || `ReturnCode ${data.ReturnCode}`));
+        }
+        const list = Array.isArray(data?.DeviceList) ? data.DeviceList : [];
+        filtered = list.filter((d) => LAN_DEVICE_HARDWARE_WHITELIST.has(Number(d.Hardware)));
       }
-      if (!res.ok) {
-        throw new Error(text.slice(0, 240) || String(res.status));
-      }
-      if (data && data.ReturnCode !== undefined && Number(data.ReturnCode) !== 0) {
-        throw new Error(String(data.ReturnMessage || `ReturnCode ${data.ReturnCode}`));
-      }
-      const list = Array.isArray(data?.DeviceList) ? data.DeviceList : [];
-      const filtered = list.filter((d) => LAN_DEVICE_HARDWARE_WHITELIST.has(Number(d.Hardware)));
       lanDeviceRowsById = new Map(filtered.map((d) => [String(d.DeviceId), d]));
       let savedId = "";
       try {
@@ -6075,19 +6147,33 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         savedId = "";
       }
       sel.innerHTML = "";
-      const ph = document.createElement("option");
-      ph.value = "";
-      ph.textContent = t("lan.device.placeholder");
-      sel.appendChild(ph);
+      if (!isSimulatedDeviceMode()) {
+        const ph = document.createElement("option");
+        ph.value = "";
+        ph.textContent = t("lan.device.placeholder");
+        sel.appendChild(ph);
+      }
       for (const d of filtered) {
         const id = String(d.DeviceId);
         const opt = document.createElement("option");
         opt.value = id;
         const name = String(d.DeviceName || id).trim() || id;
-        opt.textContent = `${name} (${d.DevicePrivateIP})`;
+        if (isSimulatedDeviceMode()) {
+          opt.textContent = `${name} (${t("lan.device.simulated")})`;
+        } else {
+          opt.textContent = `${name} (${d.DevicePrivateIP})`;
+        }
         sel.appendChild(opt);
       }
-      if (savedId && lanDeviceRowsById.has(savedId)) {
+      if (isSimulatedDeviceMode() && filtered.length) {
+        const simRow = filtered[0];
+        sel.value = String(simRow.DeviceId);
+        try {
+          localStorage.setItem("divoom_lan_selected_device_id", String(simRow.DeviceId));
+        } catch {
+          /* ignore */
+        }
+      } else if (savedId && lanDeviceRowsById.has(savedId)) {
         sel.value = savedId;
         persistLanDeviceRow(lanDeviceRowsById.get(savedId));
       } else {
@@ -6110,9 +6196,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   function wireLanDeviceUi() {
     if (dom.btnRefreshLanDevices) {
-      dom.btnRefreshLanDevices.addEventListener("click", () => {
-        void refreshLanDeviceListUi({ silent: false });
-      });
+      dom.btnRefreshLanDevices.hidden = isSimulatedDeviceMode();
+      if (!isSimulatedDeviceMode()) {
+        dom.btnRefreshLanDevices.addEventListener("click", () => {
+          void refreshLanDeviceListUi({ silent: false });
+        });
+      }
+    }
+    if (dom.selectLanDevice && isSimulatedDeviceMode()) {
+      dom.selectLanDevice.disabled = true;
     }
     if (dom.btnLanCopyDebug) {
       dom.btnLanCopyDebug.addEventListener("click", () => {
@@ -6175,6 +6267,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   function applyConfig(raw, sourceLabel) {
+    syncEditorCanvasDimensions();
     clearAllLocalDispAssets();
     state.config = normalizeConfig(raw);
     state.previewTextOverrides.clear();
@@ -6435,6 +6528,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const id = toNum(clockId, NaN);
     if (!Number.isFinite(id)) return;
 
+    syncEditorCanvasDimensions();
     window.clearTimeout(namingDebounceTimer);
 
     const token = ++templateState.loadToken;
@@ -7604,7 +7698,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   function applyTemplatePreviewFit() {
     const stage = dom.previewStage;
     const canvas = dom.canvas;
-    if (!stage || !canvas || !state.width || !state.height) return;
+    const dialW = EDITOR_CANVAS_WIDTH;
+    const dialH = EDITOR_CANVAS_HEIGHT;
+    if (!stage || !canvas || !dialW || !dialH) return;
     const cs = window.getComputedStyle(stage);
     const padX =
       (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
@@ -7615,15 +7711,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     let availH = cr.height - padY;
     if (availW < 40 || availH < 40) {
       const zFallback = 22;
-      canvas.style.width = `${Math.round(state.width * (zFallback / 100))}px`;
-      canvas.style.height = `${Math.round(state.height * (zFallback / 100))}px`;
+      canvas.style.width = `${Math.round(dialW * (zFallback / 100))}px`;
+      canvas.style.height = `${Math.round(dialH * (zFallback / 100))}px`;
       return;
     }
-    const zw = (availW / state.width) * 100;
-    const zh = (availH / state.height) * 100;
+    const zw = (availW / dialW) * 100;
+    const zh = (availH / dialH) * 100;
     const z = clamp(Math.min(zw, zh), 10, 100);
-    canvas.style.width = `${Math.round(state.width * (z / 100))}px`;
-    canvas.style.height = `${Math.round(state.height * (z / 100))}px`;
+    canvas.style.width = `${Math.round(dialW * (z / 100))}px`;
+    canvas.style.height = `${Math.round(dialH * (z / 100))}px`;
   }
 
   function applyCanvasZoom() {

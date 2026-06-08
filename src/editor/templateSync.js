@@ -146,6 +146,60 @@ export function buildClassifyCacheFromSync(classifyRows) {
   };
 }
 
+/**
+ * 从中国区商店拉取分类中/英名称（API 按 Language 只填 ClassifyName 单字段）。
+ * @returns {Map<number, { ClassifyName: string, ClassifyNameEn: string }>}
+ */
+export async function fetchBilingualClassifyNameIndex(storeJson) {
+  const [zhResp, enResp] = await Promise.all([
+    fetchStoreClockClassify(storeJson, "zh-hans"),
+    fetchStoreClockClassify(storeJson, "en")
+  ]);
+  const enById = new Map();
+  for (const row of Array.isArray(enResp?.ClassifyList) ? enResp.ClassifyList : []) {
+    const id = Number(row?.ClassifyId);
+    if (!Number.isFinite(id)) continue;
+    enById.set(id, String(row?.ClassifyName || "").trim());
+  }
+  const index = new Map();
+  for (const row of Array.isArray(zhResp?.ClassifyList) ? zhResp.ClassifyList : []) {
+    const id = Number(row?.ClassifyId);
+    if (!Number.isFinite(id)) continue;
+    const cn = String(row?.ClassifyName || "").trim();
+    const en = enById.get(id) || cn;
+    index.set(id, { ClassifyName: cn, ClassifyNameEn: en });
+  }
+  for (const [id, en] of enById.entries()) {
+    if (index.has(id)) continue;
+    index.set(id, { ClassifyName: en, ClassifyNameEn: en });
+  }
+  return index;
+}
+
+/** 用商店分类名补全 classify-cache 里缺失的 ClassifyName / ClassifyNameEn。 */
+export function enrichClassifyCatalogNames(catalog, nameIndex) {
+  if (!catalog || typeof catalog !== "object" || !nameIndex?.size) return catalog;
+  const list = Array.isArray(catalog.ClassifyList) ? catalog.ClassifyList : [];
+  const ClassifyList = list.map((row) => {
+    const id = Number(row?.ClassifyId);
+    const names = Number.isFinite(id) ? nameIndex.get(id) : null;
+    if (!names) return row;
+    const cn = String(row?.ClassifyName || "").trim() || names.ClassifyName;
+    const en = String(row?.ClassifyNameEn || "").trim() || names.ClassifyNameEn || cn;
+    return { ...row, ClassifyName: cn, ClassifyNameEn: en };
+  });
+  return { ...catalog, ClassifyList };
+}
+
+export function classifyCatalogNeedsNameEnrichment(catalog) {
+  const list = Array.isArray(catalog?.ClassifyList) ? catalog.ClassifyList : [];
+  return list.some((row) => {
+    const id = Number(row?.ClassifyId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    return !String(row?.ClassifyName || "").trim() && !String(row?.ClassifyNameEn || "").trim();
+  });
+}
+
 /** 合并多份 ClassifyList（取并集），避免单次下载覆盖整表分类目录。 */
 export function mergeClassifyCatalogSnapshots(...sources) {
   const byId = new Map();
@@ -550,7 +604,7 @@ export async function scanPendingTemplatesFromDevice({
 export async function mergeClockIdIntoClassifyCache(
   classifyId,
   clockId,
-  { loadClassifyCache, getBaseClassifyData, fallbackClassifyData }
+  { loadClassifyCache, getBaseClassifyData, fallbackClassifyData, classifyName, classifyNameEn }
 ) {
   const layers = [];
   if (fallbackClassifyData) layers.push(fallbackClassifyData);
@@ -579,9 +633,14 @@ export async function mergeClockIdIntoClassifyCache(
     clockid: [...(Array.isArray(r.clockid) ? r.clockid : [])]
   }));
   let row = list.find((r) => Number(r.ClassifyId) === cid);
+  const nameCn = String(classifyName || "").trim();
+  const nameEn = String(classifyNameEn || classifyName || "").trim();
   if (!row) {
-    row = { ClassifyId: cid, ClassifyName: "", ClassifyNameEn: "", clockid: [] };
+    row = { ClassifyId: cid, ClassifyName: nameCn, ClassifyNameEn: nameEn, clockid: [] };
     list.push(row);
+  } else {
+    if (!String(row.ClassifyName || "").trim() && nameCn) row.ClassifyName = nameCn;
+    if (!String(row.ClassifyNameEn || "").trim() && nameEn) row.ClassifyNameEn = nameEn;
   }
   const idSet = new Set(
     row.clockid.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
@@ -604,6 +663,8 @@ export async function downloadSingleTemplateToLocal({
   divoomJson,
   clockId,
   classifyId,
+  classifyName,
+  classifyNameEn,
   getSlotByItem,
   isImageItem,
   loadFontInfo,
@@ -670,7 +731,9 @@ export async function downloadSingleTemplateToLocal({
   const classifyCache = await mergeClockIdIntoClassifyCache(classifyId, id, {
     loadClassifyCache,
     getBaseClassifyData,
-    fallbackClassifyData
+    fallbackClassifyData,
+    classifyName,
+    classifyNameEn
   });
 
   report({ percent: 100, message: "done" });

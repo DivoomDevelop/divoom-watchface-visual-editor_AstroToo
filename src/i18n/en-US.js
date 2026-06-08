@@ -280,6 +280,7 @@ const enUS = Object.freeze({
   "lan.success.create": "Create-local-clock succeeded, but the response contained no usable ClockId. Confirm on the device or use Apply watchface config again.",
   "lan.busy": "Talking to device…",
   "lan.device.placeholder": "Select device (name & IP)",
+  "lan.device.simulated": "simulated",
   "lan.device.noneInList": "No matching frame devices (Hardware 500/510/511/512).",
   "lan.device.listFailed": "Failed to load device list: {message}",
 

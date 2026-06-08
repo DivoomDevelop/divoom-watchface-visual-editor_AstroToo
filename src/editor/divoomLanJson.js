@@ -1,4 +1,6 @@
-/** 与固件 `divoom_net_command_json_packet` 一致的 LAN JSON 根字段。 */
+import { getSimulatedDeviceId, getSimulatedDeviceType } from "./simulatedDevice.js";
+
+/** 与固件 `divoom_net_command_json_packet` 一致的 LAN JSON 根字段（非仿真时 Frame 系设备）。 */
 export const DIVOOM_DEVICE_TYPE_FRAME = "Frame";
 
 let packetFlagCounter = 0;
@@ -25,6 +27,8 @@ export function resolveLanDeviceId(getDeviceId) {
   } catch {
     /* ignore */
   }
+  const simId = getSimulatedDeviceId();
+  if (simId > 0) return simId;
   return 0;
 }
 
@@ -51,7 +55,7 @@ export function buildDivoomLanEnvelope(command, payload = {}, getDeviceId) {
     Command: command,
     ReturnCode: 0,
     ReturnMessage: "",
-    DeviceType: DIVOOM_DEVICE_TYPE_FRAME,
+    DeviceType: getSimulatedDeviceType(),
     DeviceId: resolveLanDeviceId(getDeviceId),
     PacketFlag: nextPacketFlag(),
     ...payload

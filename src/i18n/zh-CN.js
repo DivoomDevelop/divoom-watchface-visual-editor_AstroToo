@@ -275,6 +275,7 @@ const zhCN = Object.freeze({
   "lan.success.create": "已在设备请求创建表盘，但应答未包含可用的 ClockId，请在对端界面确认或使用「应用表盘配置」再次同步配置。",
   "lan.busy": "正在与设备通信…",
   "lan.device.placeholder": "选择设备（名称与 IP）",
+  "lan.device.simulated": "仿真",
   "lan.device.noneInList": "未发现相框类设备（Hardware 为 500/510/511/512）。",
   "lan.device.listFailed": "获取设备列表失败：{message}",
 
