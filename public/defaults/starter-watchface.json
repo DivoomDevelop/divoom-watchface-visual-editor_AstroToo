@@ -1,0 +1,38 @@
+{
+  "DeviceType": 0,
+  "PixelDialType": 0,
+  "IsComponent": 0,
+  "NameCn": "AstroToo 默认",
+  "NameEn": "AstroToo Default",
+  "DeviceImageUrl": "",
+  "DevicePreviewImageUrl": "",
+  "DevicePreviewImageUrl2": "",
+  "SysUpdateTime": 1746510823,
+  "ClockId": 0,
+  "AppNum": 0,
+  "StyleClockId": 0,
+  "ItemList": [
+    {
+      "size": 72,
+      "x": 40,
+      "y": 200,
+      "w": 400,
+      "h": 80,
+      "disp": 4,
+      "alig": 3,
+      "sep": 0,
+      "font": 102,
+      "image_id": 0,
+      "image_addr": "",
+      "angle": 0,
+      "hier": 0,
+      "transp": 100,
+      "animation": 0,
+      "item_id": "",
+      "color_1": "#ffffff",
+      "color_2": "#ff0000"
+    }
+  ],
+  "ItemIdList": [""],
+  "SetColorList": [0]
+}

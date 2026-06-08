@@ -1,0 +1,27 @@
+{
+  "name": "divoom-watchface-visual-editor-astrotoo",
+  "version": "0.1.0",
+  "description": "Divoom AstroToo watchface visual editor (480×480, Vite + static templates)",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/issues"
+  },
+  "homepage": "https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "prebuild": "npm run gen:ai-docs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "gen:ai-docs": "node scripts/gen-ai-docs.mjs",
+    "lan:probe": "node scripts/lan-probe.mjs"
+  },
+  "devDependencies": {
+    "http-proxy": "^1.18.1",
+    "vite": "^6.3.5"
+  }
+}
