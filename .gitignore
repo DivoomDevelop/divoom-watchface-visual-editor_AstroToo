@@ -2,3 +2,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# Device-synced resources (project-specific; sync via dev server or copy locally)
+public/font/
+public/template/
