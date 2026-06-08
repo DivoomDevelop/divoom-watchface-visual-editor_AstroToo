@@ -456,11 +456,16 @@ button:disabled {
   cursor: pointer;
 }
 
-.local-watch-delete {
+.local-watch-delete,
+.local-watch-export {
   flex-shrink: 0;
   padding: 2px 8px;
   font-size: 16px;
   line-height: 1;
+}
+
+.local-watch-export {
+  font-size: 12px;
 }
 
 .btn-compact {

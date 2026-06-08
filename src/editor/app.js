@@ -44,6 +44,10 @@ import {
   isSimulatedDeviceMode
 } from "./simulatedDevice.js";
 import {
+  exportWatchfaceToDirectory,
+  isWatchfaceDirectoryExportSupported
+} from "./watchfaceExport.js";
+import {
   classifyCatalogNeedsNameEnrichment,
   downloadSingleTemplateToLocal,
   enrichClassifyCatalogNames,
@@ -3667,6 +3671,122 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return false;
   }
 
+  async function buildWatchfaceExportDeps(exportRecordId = "") {
+    async function fetchPublicFileForExport(relPath) {
+      const rel = String(relPath || "").replace(/^\/+/, "");
+      if (!rel || rel.includes("..")) return null;
+      try {
+        const res = await fetch(withBase(rel), { cache: "no-store" });
+        if (!res.ok) return null;
+        return new Uint8Array(await res.arrayBuffer());
+      } catch {
+        return null;
+      }
+    }
+
+    async function fetchTemplateAssetForExport(relPrefix, baseName, extCandidates) {
+      const baseDir = relPrefix.startsWith("http") ? relPrefix : withBase(relPrefix);
+      const result = await loadFirstTemplateAsset(baseDir, baseName, extCandidates);
+      const asset = result?.asset;
+      if (!asset) return null;
+      try {
+        if (asset.sourceUrl) {
+          const res = await fetch(asset.sourceUrl, { cache: "no-store" });
+          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+        }
+        if (asset.objectUrl) {
+          const res = await fetch(asset.objectUrl);
+          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    }
+
+    async function fetchLiveItemAsset(itemKey) {
+      if (String(exportRecordId) !== String(activeLocalWatchfaceId || "")) return null;
+      const idx = Number(itemKey);
+      if (!Number.isFinite(idx) || idx < 0) return null;
+      const item = state.config?.ItemList?.[idx];
+      if (!item) return null;
+      const asset = getLocalDispAsset(item);
+      if (!asset) return null;
+      try {
+        if (asset.sourceUrl) {
+          const res = await fetch(asset.sourceUrl, { cache: "no-store" });
+          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+        }
+        if (asset.objectUrl) {
+          const res = await fetch(asset.objectUrl);
+          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    }
+
+    return {
+      isTemplateImageItem,
+      getTemplateSlotByItem,
+      itemKey: (_item, idx) => String(idx),
+      bgExtCandidates: TEMPLATE_BG_EXT_CANDIDATES,
+      imgExtCandidates: TEMPLATE_IMG_EXT_CANDIDATES,
+      fetchPublicFile: fetchPublicFileForExport,
+      fetchTemplateAsset: fetchTemplateAssetForExport,
+      fetchLiveItemAsset,
+      editorMeta: { build: APP_BUILD_TAG }
+    };
+  }
+
+  async function exportLocalWatchfaceById(id) {
+    if (!id) return;
+    if (!isWatchfaceDirectoryExportSupported()) {
+      alert(t("localWatch.export.unsupported"));
+      return;
+    }
+    if (id === activeLocalWatchfaceId) {
+      await flushPersistActiveWorkspace();
+    }
+    const rec = getWatchface(id);
+    if (!rec) {
+      alert(t("localWatch.export.missing"));
+      return;
+    }
+
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    } catch (e) {
+      if (e?.name === "AbortError") return;
+      alert(t("localWatch.export.failed", { message: errorToText(e) }));
+      return;
+    }
+
+    try {
+      const deps = await buildWatchfaceExportDeps(id);
+      const { written, missing } = await exportWatchfaceToDirectory(rec, dirHandle, deps);
+      const msg = missing.length
+        ? t("localWatch.export.donePartial", { written: written.length, missing: missing.length })
+        : t("localWatch.export.done", { count: written.length });
+      alert(msg);
+      fontStore.log(
+        t("localWatch.export.log", {
+          name: rec.name || id,
+          written: written.length,
+          missing: missing.length
+        })
+      );
+      if (missing.length) {
+        fontStore.log(t("localWatch.export.missingList", { list: missing.slice(0, 12).join(", ") }));
+      }
+    } catch (e) {
+      alert(t("localWatch.export.failed", { message: errorToText(e) }));
+      fontStore.log(t("localWatch.export.failed", { message: errorToText(e) }));
+    }
+  }
+
   function refreshLocalWatchfaceListUi() {
     const ul = dom.localWatchfaceList;
     if (!ul) return;
@@ -3690,6 +3810,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       });
       const actions = document.createElement("div");
       actions.className = "local-watch-row-actions";
+      const exp = document.createElement("button");
+      exp.type = "button";
+      exp.className = "btn-ghost btn-compact local-watch-export";
+      exp.setAttribute("aria-label", t("localWatch.exportAria"));
+      exp.textContent = t("localWatch.exportBtn");
+      exp.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        void exportLocalWatchfaceById(row.id);
+      });
+      actions.appendChild(exp);
       const clockIdOnRecord = toNum(row.config?.ClockId, 0);
       if (clockIdOnRecord > 0) {
         const dup = document.createElement("button");
