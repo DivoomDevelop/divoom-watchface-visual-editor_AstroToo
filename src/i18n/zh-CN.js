@@ -14,6 +14,7 @@ const zhCN = Object.freeze({
   "browseTemplate.savedFromTemplate": "已从模板 #{templateId} 复制到我的设计：{name}",
   "ui.sec.canvas": "2) 画布",
   "ui.sec.background": "表盘底图",
+  "ui.sec.appPreview": "APP预览图",
   "ui.sec.items": "3) 显示元素(ItemList)",
   "ui.sec.editor": "4) 选中元素编辑",
 
@@ -22,7 +23,10 @@ const zhCN = Object.freeze({
   "ui.label.zoom": "缩放(%)",
   "ui.label.bgFile": "选择底图",
   "ui.label.bgSourcePath": "底图路径",
+  "ui.label.appPreviewFile": "选择预览图",
+  "ui.label.appPreviewSourcePath": "预览图路径",
   "ui.bg.localFileHint": "本地文件 ({name})",
+  "ui.appPreview.localFileHint": "本地文件 ({name})",
   "ui.fileProtocol.title": "无法以「仅双击 index.html」的方式加载字体与模板",
   "ui.fileProtocol.body": "Chrome、Edge 等浏览器会禁止 file:// 页面读取同目录下的 font、template 等资源。请改用：本文件夹中的 start-local-preview.cmd（将自动打开浏览器，需已安装 Python 3）；或在含有 package.json 的项目根目录运行 npm run preview。",
   "ui.fileProtocol.dismiss": "知道了",
@@ -40,6 +44,7 @@ const zhCN = Object.freeze({
   "ui.btn.applyJson": "应用粘贴的 JSON",
   "ui.btn.clearJson": "清空文本",
   "ui.btn.clearBg": "清除底图",
+  "ui.btn.clearAppPreview": "清除预览图",
   "ui.btn.applyResolution": "应用分辨率",
   "ui.btn.applyTemplate": "应用模板",
   "ui.btn.add": "新增",
@@ -82,6 +87,7 @@ const zhCN = Object.freeze({
   "about.adminLoggedOut": "已在本浏览器关闭管理员模式。",
 
   "editor.itemId": "元素标识（item_id）",
+  "editor.desc": "描述（desc）",
   "editor.disp": "显示元素类型（disp）",
   "editor.font": "字体选择（font）",
   "editor.previewText": "模拟显示数据（不导出）",
@@ -329,6 +335,8 @@ const zhCN = Object.freeze({
   "log.templateApplied": "模板 {id} 已应用。{resourceSummary}",
   "log.configExported": "已导出配置: {name}",
   "log.backgroundLoaded": "底图已加载: {name}",
+  "log.appPreviewLoaded": "APP预览图已加载: {name}",
+  "alert.appPreviewLoadFailed": "APP预览图加载失败",
   "log.uiBuildVersion": "UI构建版本: {tag}",
   "log.bundledStarterSeeded": "已写入默认「我的设计」条目：{name}。"
 });

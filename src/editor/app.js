@@ -534,6 +534,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   const TEMPLATE_ORGANIZE_REPORT_PATH = withBase("template/organize-report.json");
   const TEMPLATE_CLASSIFY_CACHE_PATH = withBase("template/classify-cache.json");
   const TEMPLATE_BG_EXT_CANDIDATES = [".bin", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
+  const TEMPLATE_PREVIEW_EXT_CANDIDATES = [".png", ".jpg", ".jpeg", ".webp"];
   const TEMPLATE_IMG_EXT_CANDIDATES = [".bin", ".png", ".webp", ".gif", ".jpg", ".jpeg"];
   const TEMPLATE_CLASSIFY_FALLBACK = Object.freeze({
     ReturnCode: 0,
@@ -814,6 +815,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     size: 64,
     disp: 4,
     font: 0,
+    desc: "",
     color_1: "#ffffff",
     color_2: "#000000",
     image_id: 0,
@@ -1495,6 +1497,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     dom.txtBgSourcePath.title = state.backgroundSourceLabel || "";
   }
 
+  function refreshAppPreviewSourceLabel() {
+    syncTemplateDomRefs();
+    if (!dom.txtAppPreviewSourcePath) return;
+    dom.txtAppPreviewSourcePath.value = state.appPreviewSourceLabel || "";
+    dom.txtAppPreviewSourcePath.title = state.appPreviewSourceLabel || "";
+  }
+
   function fontBaseFromCfgPath(cfgPath) {
     const raw = String(cfgPath || "");
     if (!raw) return "";
@@ -2135,12 +2144,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     localWatchfaceList: byId("local-watchface-list"),
     secCanvasTitle: byId("sec-canvas-title"),
     secBackgroundTitle: byId("sec-background-title"),
+    secAppPreviewTitle: byId("sec-app-preview-title"),
     secItemlistTitle: byId("sec-itemlist-title"),
     secEditorTitle: byId("sec-editor-title"),
     lblTemplateCategory: byId("lbl-template-category"),
     lblInputZoom: byId("lbl-input-zoom"),
     lblInputBgFile: byId("lbl-input-bg-file"),
     lblBgSourcePath: byId("lbl-bg-source-path"),
+    lblInputAppPreviewFile: byId("lbl-input-app-preview-file"),
+    lblAppPreviewSourcePath: byId("lbl-app-preview-source-path"),
     lblCurrentClock: byId("lbl-current-clock"),
     lblClockId: byId("lbl-clock-id"),
     lblItemCount: byId("lbl-item-count"),
@@ -2156,6 +2168,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     inputBgFile: byId("input-bg-file"),
     txtBgSourcePath: byId("txt-bg-source-path"),
     btnClearBg: byId("btn-clear-bg"),
+    inputAppPreviewFile: byId("input-app-preview-file"),
+    txtAppPreviewSourcePath: byId("txt-app-preview-source-path"),
+    btnClearAppPreview: byId("btn-clear-app-preview"),
     btnLanApplyWatchfaceConfig: byId("btn-lan-apply-config"),
     btnLanShowCurrentClockOnDevice: byId("btn-lan-show-current-clock"),
     btnLanCreateOnDevice: byId("btn-lan-create-on-device"),
@@ -2229,12 +2244,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const list = byId("template-list");
     const bgPath = byId("txt-bg-source-path");
     const lblBgPath = byId("lbl-bg-source-path");
+    const appPreviewPath = byId("txt-app-preview-source-path");
+    const lblAppPreviewPath = byId("lbl-app-preview-source-path");
     if (sel) dom.selectTemplateCategory = sel;
     if (rail) dom.templateCategoryRail = rail;
     if (hint) dom.templateHint = hint;
     if (list) dom.templateList = list;
     if (bgPath) dom.txtBgSourcePath = bgPath;
     if (lblBgPath) dom.lblBgSourcePath = lblBgPath;
+    if (appPreviewPath) dom.txtAppPreviewSourcePath = appPreviewPath;
+    if (lblAppPreviewPath) dom.lblAppPreviewSourcePath = lblAppPreviewPath;
     const btnViewPending = byId("btn-view-pending-templates");
     const btnSync = byId("btn-sync-templates");
     const syncStatus = byId("template-sync-status");
@@ -2264,6 +2283,11 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     backgroundObjectUrl: "",
     /** 模板底图等：只读框展示的绝对 URL 或本地上传说明（浏览器无法取得真实磁盘路径） */
     backgroundSourceLabel: "",
+    appPreviewImage: null,
+    appPreviewName: "",
+    appPreviewObjectUrl: "",
+    /** APP 预览图：只读框展示的绝对 URL 或本地上传说明 */
+    appPreviewSourceLabel: "",
     tickHandle: null
   };
 
@@ -2309,6 +2333,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   let namingPromptDismissed = false;
   let autosaveTimer = 0;
   let namingDebounceTimer = 0;
+  /** 文件选择等原生对话框需要主线程空闲；>0 时暂停表盘预览定时器。 */
+  let watchfaceTickPauseDepth = 0;
+  const persistImageCache = {
+    bg: { key: "", dataUrl: null },
+    appPreview: { key: "", dataUrl: null }
+  };
   let saveNamedDialogResolver = null;
   /** 左侧：`local`=可编辑本地；`template`=仅浏览内置模板预览 */
   let sidebarBrowseMode = "local";
@@ -2437,6 +2467,39 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     state.backgroundObjectUrl = String(asset.objectUrl || "");
   }
 
+  function clearAppPreviewObjectUrl() {
+    if (!state.appPreviewObjectUrl) return;
+    try {
+      URL.revokeObjectURL(state.appPreviewObjectUrl);
+    } catch (e) {
+      // ignore
+    }
+    state.appPreviewObjectUrl = "";
+  }
+
+  function clearAppPreviewState() {
+    clearAppPreviewObjectUrl();
+    invalidatePersistImageCache("appPreview");
+    state.appPreviewImage = null;
+    state.appPreviewName = "";
+    state.appPreviewSourceLabel = "";
+    if (dom.inputAppPreviewFile) dom.inputAppPreviewFile.value = "";
+    if (state.config && typeof state.config === "object") state.config.AppPreviewImageUrl = "";
+    refreshAppPreviewSourceLabel();
+  }
+
+  function setAppPreviewFromAsset(asset) {
+    clearAppPreviewObjectUrl();
+    if (!asset?.image) {
+      state.appPreviewImage = null;
+      state.appPreviewName = "";
+      return;
+    }
+    state.appPreviewImage = asset.image;
+    state.appPreviewName = asset.name || "";
+    state.appPreviewObjectUrl = String(asset.objectUrl || "");
+  }
+
   function isTemplateImageItem(item) {
     const disp = toNum(item?.disp, 0);
     return (
@@ -2518,6 +2581,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   const editorFields = [
     { key: "item_id", type: "text", labelKey: "editor.itemId", full: true },
+    { key: "desc", type: "text", labelKey: "editor.desc", full: true },
     { key: "disp", type: "disp-select", labelKey: "editor.disp" },
     { key: "font", type: "font-select", labelKey: "editor.font" },
     { key: "__preview_text__", type: "text", labelKey: "editor.previewText", full: true },
@@ -2547,6 +2611,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   /** 图像字体仅使用排版矩形与对齐；其余样式项在设备侧无效，编辑面板中隐藏。 */
   const IMAGE_FONT_EDITOR_VISIBLE_KEYS = new Set([
     "item_id",
+    "desc",
     "disp",
     "font",
     "__preview_text__",
@@ -2764,6 +2829,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
     setNodeText(dom.secCanvasTitle, t("ui.sec.canvas"));
     setNodeText(dom.secBackgroundTitle, t("ui.sec.background"));
+    if (dom.secAppPreviewTitle) setNodeText(dom.secAppPreviewTitle, t("ui.sec.appPreview"));
     setNodeText(dom.secItemlistTitle, t("ui.sec.items"));
     setNodeText(dom.secEditorTitle, t("ui.sec.editor"));
 
@@ -2774,7 +2840,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     setNodeText(dom.lblInputZoom, t("ui.label.zoom"));
     setNodeText(dom.lblInputBgFile, t("ui.label.bgFile"));
     if (dom.lblBgSourcePath) setNodeText(dom.lblBgSourcePath, t("ui.label.bgSourcePath"));
+    if (dom.lblInputAppPreviewFile) setNodeText(dom.lblInputAppPreviewFile, t("ui.label.appPreviewFile"));
+    if (dom.lblAppPreviewSourcePath) setNodeText(dom.lblAppPreviewSourcePath, t("ui.label.appPreviewSourcePath"));
     setNodeText(dom.btnClearBg, t("ui.btn.clearBg"));
+    if (dom.btnClearAppPreview) setNodeText(dom.btnClearAppPreview, t("ui.btn.clearAppPreview"));
     if (dom.btnLanApplyWatchfaceConfig)
       setNodeText(dom.btnLanApplyWatchfaceConfig, t("ui.btn.lanApplyWatchfaceConfig"));
     if (dom.btnLanShowCurrentClockOnDevice)
@@ -2869,6 +2938,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     item.animation = toNum(item.animation, 0);
     item.image_id = toNum(item.image_id, 0);
     item.image_addr = String(item.image_addr || "");
+    item.desc = String(item.desc ?? "");
     return item;
   }
 
@@ -3433,6 +3503,58 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
   }
 
+  function persistImageCacheKey(img, name) {
+    if (!img || !img.complete || img.naturalWidth <= 0) return "";
+    const src = String(img.src || "");
+    return `${name || ""}|${img.naturalWidth}x${img.naturalHeight}|${src.length}|${src.slice(-64)}`;
+  }
+
+  function invalidatePersistImageCache(slot) {
+    if (slot === "bg" || slot === "appPreview") {
+      persistImageCache[slot] = { key: "", dataUrl: null };
+      return;
+    }
+    persistImageCache.bg = { key: "", dataUrl: null };
+    persistImageCache.appPreview = { key: "", dataUrl: null };
+  }
+
+  async function cachedImageDataUrlForPersist(slot, img, name) {
+    const key = persistImageCacheKey(img, name);
+    if (!key) return null;
+    const entry = persistImageCache[slot];
+    if (entry.key === key && entry.dataUrl) return entry.dataUrl;
+    const dataUrl = await imageToDataUrlForPersist(img);
+    persistImageCache[slot] = { key, dataUrl };
+    return dataUrl;
+  }
+
+  function pauseWatchfaceTick() {
+    watchfaceTickPauseDepth += 1;
+    if (watchfaceTickPauseDepth === 1 && state.tickHandle) {
+      clearInterval(state.tickHandle);
+      state.tickHandle = 0;
+    }
+  }
+
+  function resumeWatchfaceTick() {
+    if (watchfaceTickPauseDepth <= 0) return;
+    watchfaceTickPauseDepth -= 1;
+    if (watchfaceTickPauseDepth === 0 && !state.tickHandle) {
+      state.tickHandle = setInterval(() => renderWatchface(), PREVIEW_TICK_MS);
+    }
+  }
+
+  function wireResponsiveFileInput(input) {
+    if (!input) return;
+    const onActivate = () => pauseWatchfaceTick();
+    const onDeactivate = () => resumeWatchfaceTick();
+    input.addEventListener("pointerdown", onActivate, true);
+    input.addEventListener("focus", onActivate, true);
+    input.addEventListener("change", onDeactivate);
+    input.addEventListener("blur", onDeactivate);
+    input.addEventListener("cancel", onDeactivate);
+  }
+
   async function loadBundledThumbDataUrl(packClockId) {
     try {
       const id = toNum(packClockId, 0);
@@ -3491,7 +3613,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const nm = String(
       getClockDisplayName(state.config) || existing?.name || t("ui.default.untitled")
     ).trim();
-    const bgUrl = await imageToDataUrlForPersist(state.backgroundImage);
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    const bgUrl = await cachedImageDataUrlForPersist("bg", state.backgroundImage, state.backgroundName);
+    const appPreviewUrl = await cachedImageDataUrlForPersist(
+      "appPreview",
+      state.appPreviewImage,
+      state.appPreviewName
+    );
     syncItemIdList();
     const previewOverrides = Object.fromEntries(state.previewTextOverrides);
     const rec = {
@@ -3502,6 +3630,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       backgroundDataUrl: bgUrl,
       backgroundName: state.backgroundName || "",
       backgroundSourceLabel: state.backgroundSourceLabel || "",
+      appPreviewDataUrl: appPreviewUrl,
+      appPreviewName: state.appPreviewName || "",
+      appPreviewSourceLabel: state.appPreviewSourceLabel || "",
       width: state.width,
       height: state.height,
       zoom: state.zoom,
@@ -3511,7 +3642,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     try {
       upsert(rec);
       workspaceBaselineSig = getLanDirtySnapshot();
-      refreshLocalWatchfaceListUi();
+      if (String(existing?.name || "") !== nm) refreshLocalWatchfaceListUi();
     } catch (e) {
       alert(t("localWatch.errQuota", { message: errorToText(e) }));
     }
@@ -3598,6 +3729,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       state.backgroundSourceLabel = "";
       if (dom.inputBgFile) dom.inputBgFile.value = "";
       refreshBackgroundSourceLabel();
+      clearAppPreviewState();
       applyConfig(
         {
           ClockId: 0,
@@ -3732,6 +3864,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       getTemplateSlotByItem,
       itemKey: (_item, idx) => String(idx),
       bgExtCandidates: TEMPLATE_BG_EXT_CANDIDATES,
+      previewExtCandidates: TEMPLATE_PREVIEW_EXT_CANDIDATES,
       imgExtCandidates: TEMPLATE_IMG_EXT_CANDIDATES,
       fetchPublicFile: fetchPublicFileForExport,
       fetchTemplateAsset: fetchTemplateAssetForExport,
@@ -3895,6 +4028,36 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
     refreshBackgroundSourceLabel();
 
+    if (rec.appPreviewDataUrl) {
+      try {
+        await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            clearAppPreviewObjectUrl();
+            state.appPreviewImage = img;
+            state.appPreviewName = rec.appPreviewName || "";
+            state.appPreviewSourceLabel = rec.appPreviewSourceLabel || "";
+            resolve();
+          };
+          img.onerror = () => reject(new Error("appPreview"));
+          img.src = rec.appPreviewDataUrl;
+        });
+      } catch {
+        clearAppPreviewState();
+      }
+    } else {
+      clearAppPreviewObjectUrl();
+      state.appPreviewImage = null;
+      state.appPreviewName = "";
+      state.appPreviewSourceLabel = rec.appPreviewSourceLabel || "";
+      if (dom.inputAppPreviewFile) dom.inputAppPreviewFile.value = "";
+      const previewUrl = String(state.config?.AppPreviewImageUrl || "").trim();
+      if (!state.appPreviewSourceLabel && previewUrl) {
+        state.appPreviewSourceLabel = previewUrl;
+      }
+    }
+    refreshAppPreviewSourceLabel();
+
     if (packId > 0) {
       const token = ++templateState.loadToken;
       await applyTemplateImageAssetsByClockId(packId, token);
@@ -3908,6 +4071,20 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
           refreshBackgroundSourceLabel();
         } else if (bgResult?.asset) {
           releaseStandaloneAsset(bgResult.asset);
+        }
+      }
+      if (!rec.appPreviewDataUrl && !state.appPreviewImage) {
+        const previewResult = await loadTemplateAppPreviewByClockId(packId);
+        if (token === templateState.loadToken && previewResult?.asset) {
+          setAppPreviewFromAsset(previewResult.asset);
+          const rel = String(previewResult.path || "").trim();
+          state.appPreviewSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
+          if (state.config && typeof state.config === "object") {
+            state.config.AppPreviewImageUrl = previewResult.asset.name || `${packId + 1}.png`;
+          }
+          refreshAppPreviewSourceLabel();
+        } else if (previewResult?.asset) {
+          releaseStandaloneAsset(previewResult.asset);
         }
       }
     }
@@ -3947,6 +4124,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       state.backgroundSourceLabel = "";
       if (dom.inputBgFile) dom.inputBgFile.value = "";
       refreshBackgroundSourceLabel();
+      clearAppPreviewState();
       applyConfig(
         {
           ClockId: 0,
@@ -3998,6 +4176,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       backgroundDataUrl: src.backgroundDataUrl || "",
       backgroundName: src.backgroundName || "",
       backgroundSourceLabel: src.backgroundSourceLabel || "",
+      appPreviewDataUrl: src.appPreviewDataUrl || "",
+      appPreviewName: src.appPreviewName || "",
+      appPreviewSourceLabel: src.appPreviewSourceLabel || "",
       width: EDITOR_CANVAS_WIDTH,
       height: EDITOR_CANVAS_HEIGHT,
       zoom: src.zoom ?? 55,
@@ -4037,6 +4218,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     state.backgroundSourceLabel = "";
     if (dom.inputBgFile) dom.inputBgFile.value = "";
     refreshBackgroundSourceLabel();
+    clearAppPreviewState();
     applyConfig(
       {
         ClockId: 0,
@@ -6621,6 +6803,11 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return loadFirstTemplateAsset(TEMPLATE_DIR_15, String(bgFileId), TEMPLATE_BG_EXT_CANDIDATES);
   }
 
+  async function loadTemplateAppPreviewByClockId(clockId) {
+    const previewFileId = toNum(clockId, 0) + 1;
+    return loadFirstTemplateAsset(TEMPLATE_PREVIEW_DIR_33, String(previewFileId), TEMPLATE_PREVIEW_EXT_CANDIDATES);
+  }
+
   async function applyTemplateImageAssetsByClockId(clockId, token) {
     const id = toNum(clockId, 0);
     let total = 0;
@@ -6691,14 +6878,17 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     state.backgroundName = "";
     state.backgroundSourceLabel = "";
     refreshBackgroundSourceLabel();
+    clearAppPreviewState();
     applyConfig(raw, t("source.templateConfig", { id }));
 
-    const [bgResult, imageResult] = await Promise.all([
+    const [bgResult, previewResult, imageResult] = await Promise.all([
       loadTemplateBackgroundByClockId(id),
+      loadTemplateAppPreviewByClockId(id),
       applyTemplateImageAssetsByClockId(id, token)
     ]);
     if (token !== templateState.loadToken) {
       releaseStandaloneAsset(bgResult.asset);
+      releaseStandaloneAsset(previewResult.asset);
       return;
     }
 
@@ -6712,6 +6902,18 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       summaryParts.push(t("template.resource.bgMissing"));
     }
     refreshBackgroundSourceLabel();
+    if (previewResult.asset) {
+      setAppPreviewFromAsset(previewResult.asset);
+      const rel = String(previewResult.path || "").trim();
+      state.appPreviewSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
+      if (state.config && typeof state.config === "object") {
+        state.config.AppPreviewImageUrl = previewResult.asset.name || `${id + 1}.png`;
+      }
+    } else {
+      const previewUrl = String(state.config?.AppPreviewImageUrl || "").trim();
+      state.appPreviewSourceLabel = previewUrl && /^https?:\/\//i.test(previewUrl) ? previewUrl : "";
+    }
+    refreshAppPreviewSourceLabel();
     if (imageResult && !imageResult.aborted) {
       summaryParts.push(t("template.resource.imageSummary", { ok: imageResult.loaded, total: imageResult.total }));
       if (imageResult.missing > 0) {
@@ -7763,8 +7965,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   function renderWatchface() {
-    dom.canvas.width = state.width;
-    dom.canvas.height = state.height;
+    if (dom.canvas.width !== state.width) dom.canvas.width = state.width;
+    if (dom.canvas.height !== state.height) dom.canvas.height = state.height;
     drawBackground(watchCtx);
 
     const list = state.config.ItemList || [];
@@ -7810,7 +8012,6 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
 
     applyCanvasZoom();
-    renderFontPreview();
   }
 
   function ensurePreviewStageResizeObserver() {
@@ -8202,6 +8403,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       applyCanvasZoom();
     });
 
+    wireResponsiveFileInput(dom.inputBgFile);
+    wireResponsiveFileInput(dom.inputAppPreviewFile);
+
     dom.inputBgFile.addEventListener("change", (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -8214,6 +8418,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         const img = new Image();
         img.onload = () => {
           clearBackgroundObjectUrl();
+          invalidatePersistImageCache("bg");
           state.backgroundImage = img;
           state.backgroundName = file.name;
           state.backgroundSourceLabel = t("ui.bg.localFileHint", { name: file.name });
@@ -8230,6 +8435,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
     dom.btnClearBg.addEventListener("click", () => {
       clearBackgroundObjectUrl();
+      invalidatePersistImageCache("bg");
       state.backgroundImage = null;
       state.backgroundName = "";
       state.backgroundSourceLabel = "";
@@ -8238,6 +8444,44 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       renderWatchface();
       onLocalConfigEdited();
     });
+
+    if (dom.inputAppPreviewFile) {
+      dom.inputAppPreviewFile.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (alertIfLocalPickFileTooLarge(file)) {
+          dom.inputAppPreviewFile.value = "";
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            clearAppPreviewObjectUrl();
+            invalidatePersistImageCache("appPreview");
+            state.appPreviewImage = img;
+            state.appPreviewName = file.name;
+            state.appPreviewSourceLabel = t("ui.appPreview.localFileHint", { name: file.name });
+            if (state.config && typeof state.config === "object") {
+              state.config.AppPreviewImageUrl = file.name;
+            }
+            refreshAppPreviewSourceLabel();
+            fontStore.log(t("log.appPreviewLoaded", { name: file.name }));
+            onLocalConfigEdited();
+          };
+          img.onerror = () => alert(t("alert.appPreviewLoadFailed"));
+          img.src = String(reader.result);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (dom.btnClearAppPreview) {
+      dom.btnClearAppPreview.addEventListener("click", () => {
+        clearAppPreviewState();
+        onLocalConfigEdited();
+      });
+    }
 
     if (dom.inputFontFilter) {
       dom.inputFontFilter.addEventListener("input", refreshBuiltinFontList);
@@ -8311,6 +8555,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     refreshTemplateListUi();
     fontStore.log(t("log.uiBuildVersion", { tag: APP_BUILD_TAG }));
     refreshBackgroundSourceLabel();
+    refreshAppPreviewSourceLabel();
     loadPhotoAlbumDemoImages();
 
     await ensureBundledStarterWatchfaceIfLibraryEmpty();

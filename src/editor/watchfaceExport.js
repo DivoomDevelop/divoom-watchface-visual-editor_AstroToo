@@ -2,6 +2,7 @@ import { sanitizeClockInfoForCfg } from "./templateSync.js";
 
 export const CLOCK_JSON_FILENAME = "clock.json";
 const BG_PREFIX = "BG";
+const APP_PREVIEW_PREFIX = "APP";
 const ITEM_PREFIX = "ITEM";
 const SUB_CLOCK_ID_PREFIX = "SubClockId_";
 
@@ -49,6 +50,23 @@ export function bgPrefixedExportName(rawName) {
   const base = normalizeBinLeaf(stripPrefix(rawName, BG_PREFIX));
   const stem = base.replace(/\.bin$/i, "");
   return `${BG_PREFIX}${stem}.bin`;
+}
+
+function normalizePreviewLeaf(name, fallbackStem = "preview") {
+  const raw = String(name || "").trim();
+  if (!raw) return `${fallbackStem}.jpg`;
+  if (/\.(jpg|jpeg|png|webp|gif|bin)$/i.test(raw)) return raw;
+  const stem = raw.replace(/\.[a-z0-9]+$/i, "") || fallbackStem;
+  return `${stem}.jpg`;
+}
+
+/** APP 预览图：APP + 原名（如 preview.jpg → APPpreview.jpg） */
+export function appPreviewPrefixedExportName(rawName) {
+  const base = normalizePreviewLeaf(stripPrefix(rawName, APP_PREVIEW_PREFIX));
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot) : ".jpg";
+  return `${APP_PREVIEW_PREFIX}${stem}${ext}`;
 }
 
 /** 元素图：ITEM + 原名（如 19201.bin → ITEM19201.bin） */
@@ -117,6 +135,11 @@ function allocBgName(usedNames, rawStemOrLeaf) {
   return fileName;
 }
 
+function allocAppPreviewName(usedNames, rawStemOrLeaf) {
+  const fileName = uniqueFileName(usedNames, appPreviewPrefixedExportName(rawStemOrLeaf));
+  return fileName;
+}
+
 function allocItemName(usedNames, rawStemOrLeaf) {
   const fileName = uniqueFileName(usedNames, itemPrefixedExportName(rawStemOrLeaf));
   return fileName;
@@ -182,6 +205,43 @@ export function planFlatWatchfaceExport(rec, deps) {
     clockObj.DeviceImageUrl = fileName;
   } else {
     clockObj.DeviceImageUrl = "";
+  }
+
+  if (rec?.appPreviewDataUrl) {
+    const rawBase = isSimpleLeaf(rec.appPreviewName)
+      ? rec.appPreviewName
+      : packId > 0
+        ? `${packId + 1}.jpg`
+        : "app_preview.jpg";
+    const fileName = allocAppPreviewName(usedNames, rawBase);
+    assets.push({ fileName, spec: { kind: "data-url", dataUrl: rec.appPreviewDataUrl } });
+    clockObj.AppPreviewImageUrl = fileName;
+  } else if (isSimpleLeaf(clockObj.AppPreviewImageUrl)) {
+    const leaf = String(clockObj.AppPreviewImageUrl).trim();
+    const fileName = allocAppPreviewName(usedNames, leaf);
+    const relPaths = [`template/33/${leaf}`, leaf];
+    if (packId > 0) {
+      assets.push({
+        fileName,
+        spec: {
+          kind: "template-asset",
+          relPrefix: "template/33/",
+          baseName: String(packId + 1),
+          extCandidates: deps.previewExtCandidates
+        }
+      });
+    } else {
+      assets.push({
+        fileName,
+        spec: {
+          kind: "public-leaf",
+          relPaths
+        }
+      });
+    }
+    clockObj.AppPreviewImageUrl = fileName;
+  } else {
+    clockObj.AppPreviewImageUrl = "";
   }
 
   const itemList = Array.isArray(clockObj.ItemList) ? clockObj.ItemList : [];

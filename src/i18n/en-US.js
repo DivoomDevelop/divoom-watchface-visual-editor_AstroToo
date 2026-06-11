@@ -14,6 +14,7 @@ const enUS = Object.freeze({
   "browseTemplate.savedFromTemplate": "Copied template #{templateId} to My designs: {name}",
   "ui.sec.canvas": "2) Canvas",
   "ui.sec.background": "Watchface background",
+  "ui.sec.appPreview": "APP preview image",
   "ui.sec.items": "3) Display Items (ItemList)",
   "ui.sec.editor": "4) Selected Item Editor",
 
@@ -22,7 +23,10 @@ const enUS = Object.freeze({
   "ui.label.zoom": "Zoom (%)",
   "ui.label.bgFile": "Select background image",
   "ui.label.bgSourcePath": "Background image URL",
+  "ui.label.appPreviewFile": "Select preview image",
+  "ui.label.appPreviewSourcePath": "Preview image URL",
   "ui.bg.localFileHint": "Local file ({name})",
+  "ui.appPreview.localFileHint": "Local file ({name})",
   "ui.fileProtocol.title": "Cannot load fonts/templates from a plain file:// page",
   "ui.fileProtocol.body": "Chrome, Edge, and most browsers block file:// pages from reading font/, template/, and other files next to index.html. Use start-local-preview.cmd in this folder (opens the browser; needs Python 3), or run npm run preview from the project that contains package.json.",
   "ui.fileProtocol.dismiss": "OK",
@@ -40,6 +44,7 @@ const enUS = Object.freeze({
   "ui.btn.applyJson": "Apply Pasted JSON",
   "ui.btn.clearJson": "Clear Text",
   "ui.btn.clearBg": "Clear Background",
+  "ui.btn.clearAppPreview": "Clear preview image",
   "ui.btn.applyResolution": "Apply Resolution",
   "ui.btn.applyTemplate": "Apply template",
   "ui.btn.add": "Add",
@@ -83,6 +88,7 @@ const enUS = Object.freeze({
   "about.adminLoggedOut": "Administrator mode disabled for this browser.",
 
   "editor.itemId": "Item Identifier (item_id)",
+  "editor.desc": "Description (desc)",
   "editor.disp": "Display Type (disp)",
   "editor.font": "Font Selection (font)",
   "editor.previewText": "Mock Display Data (not exported)",
@@ -334,6 +340,8 @@ const enUS = Object.freeze({
   "log.templateApplied": "Template {id} applied. {resourceSummary}",
   "log.configExported": "Config exported: {name}",
   "log.backgroundLoaded": "Background loaded: {name}",
+  "log.appPreviewLoaded": "APP preview image loaded: {name}",
+  "alert.appPreviewLoadFailed": "Failed to load APP preview image",
   "log.uiBuildVersion": "UI build version: {tag}",
   "log.bundledStarterSeeded": "Seeded default My designs entry: {name}."
 });
