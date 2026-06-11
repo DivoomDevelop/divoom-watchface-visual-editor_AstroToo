@@ -15,6 +15,7 @@ const zhCN = Object.freeze({
   "ui.sec.canvas": "2) 画布",
   "ui.sec.background": "表盘底图",
   "ui.sec.appPreview": "APP预览图",
+  "ui.sec.watchDesc": "表盘描述",
   "ui.sec.items": "3) 显示元素(ItemList)",
   "ui.sec.editor": "4) 选中元素编辑",
 
@@ -25,6 +26,8 @@ const zhCN = Object.freeze({
   "ui.label.bgSourcePath": "底图路径",
   "ui.label.appPreviewFile": "选择预览图",
   "ui.label.appPreviewSourcePath": "预览图路径",
+  "ui.label.descCn": "中文描述（DescCn）",
+  "ui.label.descEn": "英文描述（DescEn）",
   "ui.bg.localFileHint": "本地文件 ({name})",
   "ui.appPreview.localFileHint": "本地文件 ({name})",
   "ui.fileProtocol.title": "无法以「仅双击 index.html」的方式加载字体与模板",

@@ -15,6 +15,7 @@ const enUS = Object.freeze({
   "ui.sec.canvas": "2) Canvas",
   "ui.sec.background": "Watchface background",
   "ui.sec.appPreview": "APP preview image",
+  "ui.sec.watchDesc": "Watchface description",
   "ui.sec.items": "3) Display Items (ItemList)",
   "ui.sec.editor": "4) Selected Item Editor",
 
@@ -25,6 +26,8 @@ const enUS = Object.freeze({
   "ui.label.bgSourcePath": "Background image URL",
   "ui.label.appPreviewFile": "Select preview image",
   "ui.label.appPreviewSourcePath": "Preview image URL",
+  "ui.label.descCn": "Chinese description (DescCn)",
+  "ui.label.descEn": "English description (DescEn)",
   "ui.bg.localFileHint": "Local file ({name})",
   "ui.appPreview.localFileHint": "Local file ({name})",
   "ui.fileProtocol.title": "Cannot load fonts/templates from a plain file:// page",

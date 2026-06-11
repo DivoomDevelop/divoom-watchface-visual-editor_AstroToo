@@ -1504,6 +1504,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     dom.txtAppPreviewSourcePath.title = state.appPreviewSourceLabel || "";
   }
 
+  function refreshWatchDescFields() {
+    if (!state.config || typeof state.config !== "object") return;
+    if (dom.txtDescCn) dom.txtDescCn.value = String(state.config.DescCn ?? "");
+    if (dom.txtDescEn) dom.txtDescEn.value = String(state.config.DescEn ?? "");
+  }
+
   function fontBaseFromCfgPath(cfgPath) {
     const raw = String(cfgPath || "");
     if (!raw) return "";
@@ -2145,6 +2151,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     secCanvasTitle: byId("sec-canvas-title"),
     secBackgroundTitle: byId("sec-background-title"),
     secAppPreviewTitle: byId("sec-app-preview-title"),
+    secWatchDescTitle: byId("sec-watch-desc-title"),
     secItemlistTitle: byId("sec-itemlist-title"),
     secEditorTitle: byId("sec-editor-title"),
     lblTemplateCategory: byId("lbl-template-category"),
@@ -2153,6 +2160,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     lblBgSourcePath: byId("lbl-bg-source-path"),
     lblInputAppPreviewFile: byId("lbl-input-app-preview-file"),
     lblAppPreviewSourcePath: byId("lbl-app-preview-source-path"),
+    lblDescCn: byId("lbl-desc-cn"),
+    lblDescEn: byId("lbl-desc-en"),
     lblCurrentClock: byId("lbl-current-clock"),
     lblClockId: byId("lbl-clock-id"),
     lblItemCount: byId("lbl-item-count"),
@@ -2171,6 +2180,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     inputAppPreviewFile: byId("input-app-preview-file"),
     txtAppPreviewSourcePath: byId("txt-app-preview-source-path"),
     btnClearAppPreview: byId("btn-clear-app-preview"),
+    txtDescCn: byId("txt-desc-cn"),
+    txtDescEn: byId("txt-desc-en"),
     btnLanApplyWatchfaceConfig: byId("btn-lan-apply-config"),
     btnLanShowCurrentClockOnDevice: byId("btn-lan-show-current-clock"),
     btnLanCreateOnDevice: byId("btn-lan-create-on-device"),
@@ -2830,6 +2841,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     setNodeText(dom.secCanvasTitle, t("ui.sec.canvas"));
     setNodeText(dom.secBackgroundTitle, t("ui.sec.background"));
     if (dom.secAppPreviewTitle) setNodeText(dom.secAppPreviewTitle, t("ui.sec.appPreview"));
+    if (dom.secWatchDescTitle) setNodeText(dom.secWatchDescTitle, t("ui.sec.watchDesc"));
+    if (dom.lblDescCn) setNodeText(dom.lblDescCn, t("ui.label.descCn"));
+    if (dom.lblDescEn) setNodeText(dom.lblDescEn, t("ui.label.descEn"));
     setNodeText(dom.secItemlistTitle, t("ui.sec.items"));
     setNodeText(dom.secEditorTitle, t("ui.sec.editor"));
 
@@ -2975,6 +2989,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       ...base,
       NameCn: String(base.NameCn ?? base.NameEn ?? "Untitled"),
       NameEn: String(base.NameEn ?? base.NameCn ?? "Untitled"),
+      DescCn: String(base.DescCn ?? ""),
+      DescEn: String(base.DescEn ?? ""),
       ClockId: toNum(base.ClockId, 0),
       ItemList: itemList,
       ItemIdList: itemIdList
@@ -6604,6 +6620,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     state.selectedIndex = state.config.ItemList.length ? 0 : -1;
     syncItemIdList();
     dom.txtClockTitle.textContent = getClockDisplayName(state.config);
+    refreshWatchDescFields();
     refreshToolbarClockIdUi();
     refreshItemListUi();
     rebuildItemEditor();
@@ -8501,6 +8518,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       });
     }
 
+    const onWatchDescInput = () => {
+      if (!state.config || typeof state.config !== "object") return;
+      if (dom.txtDescCn) state.config.DescCn = dom.txtDescCn.value;
+      if (dom.txtDescEn) state.config.DescEn = dom.txtDescEn.value;
+      onLocalConfigEdited();
+    };
+    if (dom.txtDescCn) dom.txtDescCn.addEventListener("input", onWatchDescInput);
+    if (dom.txtDescEn) dom.txtDescEn.addEventListener("input", onWatchDescInput);
+
     if (dom.inputFontFilter) {
       dom.inputFontFilter.addEventListener("input", refreshBuiltinFontList);
     }
@@ -8574,6 +8600,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     fontStore.log(t("log.uiBuildVersion", { tag: APP_BUILD_TAG }));
     refreshBackgroundSourceLabel();
     refreshAppPreviewSourceLabel();
+    refreshWatchDescFields();
     loadPhotoAlbumDemoImages();
 
     await ensureBundledStarterWatchfaceIfLibraryEmpty();
