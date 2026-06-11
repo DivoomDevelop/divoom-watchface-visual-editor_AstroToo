@@ -88,7 +88,7 @@ const enUS = Object.freeze({
   "about.adminLoggedOut": "Administrator mode disabled for this browser.",
 
   "editor.itemId": "Item Identifier (item_id)",
-  "editor.desc": "Description (desc)",
+  "editor.info": "Description (info)",
   "editor.disp": "Display Type (disp)",
   "editor.font": "Font Selection (font)",
   "editor.previewText": "Mock Display Data (not exported)",
@@ -291,7 +291,7 @@ const enUS = Object.freeze({
   "lan.device.listFailed": "Failed to load device list: {message}",
 
   "localWatch.listEmpty": "No saved designs yet. Name and save to add one.",
-  "localWatch.listHint": "Click to open; Export writes clock.json plus BG*.bin (background) and ITEM*.bin (elements) in one folder; Copy / × as before.",
+  "localWatch.listHint": "Click to open; Export writes clock.json plus BG* / ITEM* image files (extension matches format) in one folder; Copy / × as before.",
   "localWatch.savedAs": "Saved to My designs: {name}",
   "localWatch.loaded": "Opened from My designs: {name}",
   "localWatch.newBlank": "New blank design",

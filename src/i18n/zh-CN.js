@@ -87,7 +87,7 @@ const zhCN = Object.freeze({
   "about.adminLoggedOut": "已在本浏览器关闭管理员模式。",
 
   "editor.itemId": "元素标识（item_id）",
-  "editor.desc": "描述（desc）",
+  "editor.info": "描述（info）",
   "editor.disp": "显示元素类型（disp）",
   "editor.font": "字体选择（font）",
   "editor.previewText": "模拟显示数据（不导出）",
@@ -286,7 +286,7 @@ const zhCN = Object.freeze({
   "lan.device.listFailed": "获取设备列表失败：{message}",
 
   "localWatch.listEmpty": "暂无已保存的设计；命名保存后将出现在此列表。",
-  "localWatch.listHint": "点击打开设计；「导出」生成 clock.json，底图为 BG*.bin、元素为 ITEM*.bin（同目录）；已下发设备可点「复制」；× 删除。",
+  "localWatch.listHint": "点击打开设计；「导出」生成 clock.json，底图为 BG*、元素为 ITEM*（后缀与图片格式一致，同目录）；已下发设备可点「复制」；× 删除。",
   "localWatch.savedAs": "已保存到我的设计：{name}",
   "localWatch.loaded": "已打开我的设计：{name}",
   "localWatch.newBlank": "新建空白设计",

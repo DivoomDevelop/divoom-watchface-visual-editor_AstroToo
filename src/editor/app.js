@@ -815,7 +815,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     size: 64,
     disp: 4,
     font: 0,
-    desc: "",
+    info: "",
     color_1: "#ffffff",
     color_2: "#000000",
     image_id: 0,
@@ -2484,7 +2484,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     state.appPreviewName = "";
     state.appPreviewSourceLabel = "";
     if (dom.inputAppPreviewFile) dom.inputAppPreviewFile.value = "";
-    if (state.config && typeof state.config === "object") state.config.AppPreviewImageUrl = "";
+    if (state.config && typeof state.config === "object") state.config.AppImageUrl = "";
     refreshAppPreviewSourceLabel();
   }
 
@@ -2581,7 +2581,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   const editorFields = [
     { key: "item_id", type: "text", labelKey: "editor.itemId", full: true },
-    { key: "desc", type: "text", labelKey: "editor.desc", full: true },
+    { key: "info", type: "text", labelKey: "editor.info", full: true },
     { key: "disp", type: "disp-select", labelKey: "editor.disp" },
     { key: "font", type: "font-select", labelKey: "editor.font" },
     { key: "__preview_text__", type: "text", labelKey: "editor.previewText", full: true },
@@ -2611,7 +2611,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   /** 图像字体仅使用排版矩形与对齐；其余样式项在设备侧无效，编辑面板中隐藏。 */
   const IMAGE_FONT_EDITOR_VISIBLE_KEYS = new Set([
     "item_id",
-    "desc",
+    "info",
     "disp",
     "font",
     "__preview_text__",
@@ -2938,7 +2938,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     item.animation = toNum(item.animation, 0);
     item.image_id = toNum(item.image_id, 0);
     item.image_addr = String(item.image_addr || "");
-    item.desc = String(item.desc ?? "");
+    if (item.info === undefined && item.desc !== undefined) item.info = item.desc;
+    item.info = String(item.info ?? "");
+    delete item.desc;
     return item;
   }
 
@@ -2979,6 +2981,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     };
     if (tplAsset > 0) merged.TemplateAssetClockId = tplAsset;
     else delete merged.TemplateAssetClockId;
+    if (merged.AppImageUrl === undefined && merged.AppPreviewImageUrl !== undefined) {
+      merged.AppImageUrl = merged.AppPreviewImageUrl;
+    }
+    delete merged.AppPreviewImageUrl;
     return merged;
   }
 
@@ -3810,7 +3816,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       try {
         const res = await fetch(withBase(rel), { cache: "no-store" });
         if (!res.ok) return null;
-        return new Uint8Array(await res.arrayBuffer());
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        const leaf = rel.split("/").pop() || rel;
+        return { bytes, sourceLeaf: leaf };
       } catch {
         return null;
       }
@@ -3821,14 +3829,19 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       const result = await loadFirstTemplateAsset(baseDir, baseName, extCandidates);
       const asset = result?.asset;
       if (!asset) return null;
+      const sourceLeaf = asset.name || basename(String(result.path || ""));
       try {
         if (asset.sourceUrl) {
           const res = await fetch(asset.sourceUrl, { cache: "no-store" });
-          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+          if (res.ok) {
+            return { bytes: new Uint8Array(await res.arrayBuffer()), sourceLeaf };
+          }
         }
         if (asset.objectUrl) {
           const res = await fetch(asset.objectUrl);
-          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+          if (res.ok) {
+            return { bytes: new Uint8Array(await res.arrayBuffer()), sourceLeaf };
+          }
         }
       } catch {
         return null;
@@ -3844,14 +3857,19 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       if (!item) return null;
       const asset = getLocalDispAsset(item);
       if (!asset) return null;
+      const sourceLeaf = asset.name || String(item.image_addr || "").trim();
       try {
         if (asset.sourceUrl) {
           const res = await fetch(asset.sourceUrl, { cache: "no-store" });
-          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+          if (res.ok) {
+            return { bytes: new Uint8Array(await res.arrayBuffer()), sourceLeaf };
+          }
         }
         if (asset.objectUrl) {
           const res = await fetch(asset.objectUrl);
-          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+          if (res.ok) {
+            return { bytes: new Uint8Array(await res.arrayBuffer()), sourceLeaf };
+          }
         }
       } catch {
         return null;
@@ -4051,7 +4069,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       state.appPreviewName = "";
       state.appPreviewSourceLabel = rec.appPreviewSourceLabel || "";
       if (dom.inputAppPreviewFile) dom.inputAppPreviewFile.value = "";
-      const previewUrl = String(state.config?.AppPreviewImageUrl || "").trim();
+      const previewUrl = String(state.config?.AppImageUrl || "").trim();
       if (!state.appPreviewSourceLabel && previewUrl) {
         state.appPreviewSourceLabel = previewUrl;
       }
@@ -4080,7 +4098,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
           const rel = String(previewResult.path || "").trim();
           state.appPreviewSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
           if (state.config && typeof state.config === "object") {
-            state.config.AppPreviewImageUrl = previewResult.asset.name || `${packId + 1}.png`;
+            state.config.AppImageUrl = previewResult.asset.name || `${packId + 1}.png`;
           }
           refreshAppPreviewSourceLabel();
         } else if (previewResult?.asset) {
@@ -6907,10 +6925,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       const rel = String(previewResult.path || "").trim();
       state.appPreviewSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
       if (state.config && typeof state.config === "object") {
-        state.config.AppPreviewImageUrl = previewResult.asset.name || `${id + 1}.png`;
+        state.config.AppImageUrl = previewResult.asset.name || `${id + 1}.png`;
       }
     } else {
-      const previewUrl = String(state.config?.AppPreviewImageUrl || "").trim();
+      const previewUrl = String(state.config?.AppImageUrl || "").trim();
       state.appPreviewSourceLabel = previewUrl && /^https?:\/\//i.test(previewUrl) ? previewUrl : "";
     }
     refreshAppPreviewSourceLabel();
@@ -8463,7 +8481,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
             state.appPreviewName = file.name;
             state.appPreviewSourceLabel = t("ui.appPreview.localFileHint", { name: file.name });
             if (state.config && typeof state.config === "object") {
-              state.config.AppPreviewImageUrl = file.name;
+              state.config.AppImageUrl = file.name;
             }
             refreshAppPreviewSourceLabel();
             fontStore.log(t("log.appPreviewLoaded", { name: file.name }));
