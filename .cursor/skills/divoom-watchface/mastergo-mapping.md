@@ -49,6 +49,24 @@ https://mastergo.com/file/{fileId}?...&layer_id={layerId}
 
 坐标取 **整数**（`Math.round`）。
 
+## MasterGo 字体名 → 模拟器 `font` ID
+
+MasterGo DSL 文本节点常有 `font.family` / 组件库字体名。JSON 可写 **整数 `font` ID** 或 **cfg 中的 `name` 字符串**（编辑器导入时解析，见 [SKILL.md](SKILL.md)）。
+
+| MasterGo / 设计稿 `font.family` 或描述 | 查 cfg `name` | 模拟器 `font` |
+|----------------------------------------|---------------|---------------|
+| OPPO Sans、OPPOSans Regular | OPPO Sans-Blod | **2** |
+| OPPOSans Heavy | 005-OPPOSans Heavy | **6** |
+| OPPOSans Medium | OPPOSans Medium | **28** |
+| DS-Digital、Digital-7（**TTF 动态字**） | DS-Digital Bold | **8** |
+| Bebas Neue | Bebas Neue | **12** |
+| Digital-7 / 数码位图（**固定位图风格**） | 56*112数字-白色 | **24** |
+| 22×39 方块数字 | 22*39数字(时间日期)白色方块字体 | **10** |
+
+- MG **TTF 参考字体** → 优先 type=1（2/6/8/12/28），可映射 `font.size` → JSON `size`。  
+- MG **Digital-7 实例** → 通常应对位图 id **24**（或 10/14/18/22 等），`size=0`，靠 w×h 对齐。  
+- 匹配不到时：编辑器「更新字体」同步 `GetTimeDialFontV2` 后再查 cfg；勿猜 ID。
+
 ## 字号映射公式
 
 ### 1. 矢量 TTF（type=1）

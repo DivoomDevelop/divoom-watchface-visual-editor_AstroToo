@@ -5,13 +5,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildFontLookup, resolveItemFontFields } from "../src/editor/fontResolve.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cfgPath = path.join(root, "docs/examples/astro-echo-watchface.json");
 const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 
+const fontInfoPath = path.join(root, "public/font/font_info.cfg");
+const fontInfo = JSON.parse(fs.readFileSync(fontInfoPath, "utf8"));
+const fontLookup = buildFontLookup(fontInfo.FontList || []);
+
 const errors = [];
-const allowedFontIds = new Set([2, 6, 8, 12, 24]);
+const allowedFontIds = new Set((fontInfo.FontList || []).map((f) => Number(f.id)).filter((n) => n > 0));
 
 if (!Array.isArray(cfg.ItemList) || cfg.ItemList.length === 0) {
   errors.push("ItemList is empty");
@@ -32,10 +37,11 @@ for (const item of cfg.ItemList || []) {
   if (expectedDisps[id] !== undefined && item.disp !== expectedDisps[id]) {
     errors.push(`${id}: expected disp ${expectedDisps[id]}, got ${item.disp}`);
   }
-  if (!allowedFontIds.has(item.font)) {
-    errors.push(`${id}: font ${item.font} not in allowedFontIds`);
+  const fontId = resolveItemFontFields(item, fontLookup) || Number(item.font);
+  if (!allowedFontIds.has(fontId)) {
+    errors.push(`${id}: font ${item.font} (resolved ${fontId}) not in allowedFontIds`);
   }
-  if (item.font === 2 && item.disp !== 48 && item.disp !== 55) {
+  if (fontId === 2 && item.disp !== 48 && item.disp !== 55) {
     const h = Number(item.h);
     const size = Number(item.size);
     if (Number.isFinite(size) && size > h) {

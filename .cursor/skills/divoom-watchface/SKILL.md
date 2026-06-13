@@ -5,7 +5,8 @@ description: >-
   specs. Covers disp/font mapping, MasterGo DSL→config coordinates, TTF vs
   bitmap font size rules, asset export, and import into AstroTooPCDailTool.
   Use when the user mentions 表盘、watchface、dial、MasterGo 设计导入、disp、font id,
-  ItemList, or Astro Echo watchface authoring.
+  ItemList, or Astro Echo watchface authoring. Use when matching design font names to
+  simulator font id, font_info.cfg, or GetTimeDialFontV2 names.
 ---
 
 # Divoom AstroToo 表盘生成
@@ -16,13 +17,89 @@ PC 编辑器：**480×480** 逻辑画布。输出 JSON 符合 `docs/watchface-co
 
 | 文件 | 用途 |
 |------|------|
-| `docs/generated/ai-font-catalog.json` | 合法 `font` id、type、charset |
+| `public/font/font_info.cfg` | **字体名称 ↔ 模拟器 `font` ID**（`FontList[].name` / `.id`） |
+| `docs/generated/ai-font-catalog.json` | 合法 `font` id、type、charset、**name**（由 cfg 生成） |
 | `docs/generated/ai-font-guide.md` | 字体选型与场景 |
 | `docs/generated/disp-catalog.json` | 合法 `disp` id |
 | `docs/AI_WATCHFACE_GUIDE.md` | 坐标、指针、验证流程 |
 | [mastergo-mapping.md](mastergo-mapping.md) | MasterGo 图层命名、字号映射、disp 表 |
 
-生成前运行（若 font/disp 可能过期）：`npm run gen:ai-docs`
+生成前运行（若 font/disp 可能过期）：`npm run gen:ai-docs`（**改 `font_info.cfg` 或同步新字体后必须跑**，否则 catalog 里的 name 会过期）
+
+## 字体名称 → 模拟器 `font` ID
+
+表盘 JSON 的 `ItemList[].font` **默认写整数 ID**；也支持 **字体名称**（导入时由编辑器按 `font_info.cfg` 解析为 ID）。
+
+| 写法 | 示例 | 说明 |
+|------|------|------|
+| 数字 ID | `"font": 8` | 推荐；与固件/模拟器一致 |
+| 数字字符串 | `"font": "8"` | 等价于 ID 8 |
+| 名称写在 `font` | `"font": "DS-Digital Bold"` | 按 `name` 精确/唯一模糊匹配 |
+| 独立名称字段 | `"font_name": "Bebas Neue"` | `font` 可为 0 或省略 |
+
+`name` 来自 `public/font/font_info.cfg`（可通过 **「更新字体」** 从 `Device/GetTimeDialFontV2` 同步）。  
+PC **模拟器预览**与固件均按解析后的 **ID** 加载 `(id+1).bin`。
+
+### 去哪查
+
+| 需求 | 来源 |
+|------|------|
+| 名称 → ID（权威） | `public/font/font_info.cfg` → `FontList[]` 的 `name` + `id` |
+| AI / 脚本批量查 | `docs/generated/ai-font-catalog.json` → `fonts[].name` + `fonts[].id` |
+| 编辑器目视 | 元素属性标签：`字体 (OPPO Sans-Blod #2)`；字体下拉：`OPPO Sans-Blod (#2) [TTF]` |
+| 补全 / 更新名称 | 编辑器 **「更新字体」** → `Device/GetTimeDialFontV2` 合并写入 `font_info.cfg` |
+
+### AI 查 ID 步骤
+
+1. 读 `public/font/font_info.cfg`（或已生成的 `ai-font-catalog.json`）。
+2. 在 `FontList` / `fonts` 里按 **`name` 模糊匹配**设计稿或用户给出的字体名（注意拼写差异，如 `Blod` / `Bold`、全角括号）。
+3. 取匹配行的 **`id`** 写入 JSON：`"font": <id>`。
+4. 核对 **`type`**：`1` = TTF（可调 `size`/`color_1`/`sep`）；`0` = 位图字（仅 `x,y,w,h,alig`，`size` 写 0）。
+5. 位图字再核对 **`charset`**，动态文本字符必须 ⊆ charset。
+6. 若 cfg 无该字体：编辑器「更新字体」下载后再查；仍无则勿臆造 ID。
+
+### 名称关键词 → 常见 ID（本仓库 bundled，**以 cfg 为准**）
+
+设计/MasterGo 里若出现下列关键词，优先在 cfg 里按 `name` 确认 ID：
+
+| 设计侧名称 / 关键词 | 模拟器 `font` | cfg `name` | type |
+|---------------------|---------------|------------|------|
+| OPPO Sans / OPPOSans 常规 | **2** | OPPO Sans-Blod | TTF |
+| OPPOSans Heavy / 粗黑 | **6** | 005-OPPOSans Heavy | TTF |
+| OPPOSans Medium | **28** | OPPOSans Medium | TTF |
+| DS-Digital / 数码管 | **8** | DS-Digital Bold | TTF |
+| Bebas Neue / 英文大标题 | **12** | Bebas Neue | TTF |
+| 22×39 白块数字 / 时间日期位图 | **10** | 22*39数字(时间日期)白色方块字体 | IMG |
+| 26×48 白块数字 / 比分 | **14** | 26*48数字（比分）白色方块字体 | IMG |
+| 56×112 数字 km.$ | **16** | 56*112数字/字符 | IMG |
+| 54×76 neno 数字 | **18** | 54*76数字-neno | IMG |
+| 大写英文字母 A–Z | **20** | 40*68大写字母字体-白色（26个） | IMG |
+| 44×76 黄色数字 | **22** | 44*76数字-黄色 | IMG |
+| DS Digital 位图 / 56×112 白数字 | **24** | 56*112数字-白色 | IMG |
+
+同一视觉风格可能对应多个 ID（不同字重或位图/TTF 版本）；**以 cfg 条目为准**，不要只凭 MasterGo 组件名猜 ID。
+
+### 文件与 ID 对应（固件规则）
+
+- 字体文件：`public/font/{id + 1}.bin`（例：`font: 2` → `3.bin`，`font: 28` → `29.bin`）
+- cfg 元数据：`public/font/font_info.cfg`（含 `name`、`url`、`charset`）
+
+```json
+// 方式 A：ID
+{ "item_id": "time_main", "disp": 4, "font": 8, "size": 56, ... }
+
+// 方式 B：名称（导入后归一化为 ID）
+{ "item_id": "time_main", "disp": 4, "font": "DS-Digital Bold", "size": 56, ... }
+
+// 方式 C：font_name
+{ "item_id": "title", "disp": 37, "font": 0, "font_name": "Bebas Neue", "size": 30, ... }
+```
+
+```json
+// font_info.cfg 片段 — 名称与 ID 对照
+{ "id": 8, "name": "DS-Digital Bold", "type": 1, "charset": "" }
+// → 可写 "font": 8 或 "font": "DS-Digital Bold"
+```
 
 ## 工作流
 
@@ -37,10 +114,11 @@ PC 编辑器：**480×480** 逻辑画布。输出 JSON 符合 `docs/watchface-co
 
 ### B. 纯文本/规格生成
 
-1. 只使用 `allowedFontIds`。
+1. 只使用 `allowedFontIds`（或由名称解析得到的 ID，见下节）。
 2. 每个动态元素必须有合法 `disp`。
 3. 位图字字符必须在 `charsetPreview` 内。
-4. 输出最小字段：`ClockId:0`, `NameCn/En`, `ItemIdList`, `ItemList[]`（含 `item_id,disp,font,x,y,w,h,alig,size,sep,color_1,hier,image_addr`）。
+4. **`font` 可写 ID 或名称**（见「字体名称 → 模拟器 font ID」）；导出/下发前编辑器会归一化为整数 ID。
+5. 输出最小字段：`ClockId:0`, `NameCn/En`, `ItemIdList`, `ItemList[]`（含 `item_id,disp,font,x,y,w,h,alig,size,sep,color_1,hier,image_addr`）。
 
 ### C. 交付与导入
 
@@ -83,7 +161,7 @@ node -e "import('sharp').then(s=>s.default('in.png').webp({quality:90}).toFile('
 
 ## 字号与布局（核心规则）
 
-### 矢量 TTF（type=1：id 2,6,8,12）
+### 矢量 TTF（type=1：id 2,6,8,12,28 等，见 font_info.cfg）
 
 MasterGo `fontSize` **可映射**到 JSON `size`：
 
@@ -108,7 +186,7 @@ size = 0   // 或省略；编辑器对 IMG 字忽略 size/color/sep
 - 只用 `x,y,w,h,alig` 排版；模拟器按字模 **原始像素** 绘制，**不会**缩放进 w×h
 - MG 框尺寸必须 ≥ 导入后在编辑器实测的字模占位；迭代：导入 → 看预览 → 回改 w/h
 - 字符集见 catalog；**无冒号** → `HOUR_MIN(4)` 不可用，改 `HOUR(3)+MIN(2)` 或 TTF
-- font 24（DS Digital）：`0123456789KM.$` — 仅数字/少量符号
+- font **24**（DS Digital 位图，name=`56*112数字-白色`）：`0123456789KM.$` — 仅数字/少量符号
 
 ### 对齐
 
@@ -178,7 +256,7 @@ size = 0   // 或省略；编辑器对 IMG 字忽略 size/color/sep
 
 ## 验证清单
 
-- [ ] 所有 `font` ∈ `allowedFontIds`
+- [ ] 所有 `font` ∈ `allowedFontIds`（由 `font_info.cfg` 生成；名称匹配后取对应 `id`）
 - [ ] 位图字文本 ⊆ charset
 - [ ] `x,y,w,h` 在 0..480，且不越界
 - [ ] TTF 的 `size ≤ h`
@@ -190,6 +268,7 @@ size = 0   // 或省略；编辑器对 IMG 字忽略 size/color/sep
 
 | 路径 | 说明 |
 |------|------|
+| `src/editor/fontResolve.js` | 字体 ID / 名称解析 |
 | `src/editor/watchfaceImport.js` | 导入解析 |
 | `src/editor/app.js` | `drawImageFontText`、disp 常量 |
 | `docs/examples/` | 示例 JSON |

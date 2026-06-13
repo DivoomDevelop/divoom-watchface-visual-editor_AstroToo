@@ -19,6 +19,11 @@ import {
   BUNDLED_STARTER_WATCHFACE_ID
 } from "./localWatchfacesStore.js";
 import { resolveCdnFetchUrl } from "./cdnAssets.js";
+import {
+  buildFontLookup,
+  resolveItemFontFields,
+  unresolvedFontLabel
+} from "./fontResolve.js";
 import { isDevSyncApiAvailable, saveClassifyCacheViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
 import { createDivoomChinaStoreJson } from "./divoomCloudApi.js";
 import { buildDivoomLanEnvelope } from "./divoomLanJson.js";
@@ -874,18 +879,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return clamp(Math.round(toNum(value, fallback)), -20, 200);
   }
 
-  /** 解析 Item 的字体 ID：font 常为 0 占位，真实 ID 可能在 Font / font_id 等字段（无法用 ?? 从 0 回退）。 */
+  /** 解析 Item 的字体 ID：支持数字 ID、数字字符串，或 font_info.cfg 中的 name。 */
   function resolveItemFontId(item) {
-    if (!item || typeof item !== "object") return 0;
-    const firstPositive = (...vals) => {
-      for (const v of vals) {
-        const n = toNum(v, NaN);
-        if (Number.isFinite(n) && n > 0) return n;
-      }
-      return NaN;
-    };
-    const prefer = firstPositive(item.font, item.Font, item.font_id, item.FontId);
-    if (Number.isFinite(prefer)) return prefer;
+    const lookup = buildFontLookup(fontStore.getAllMetas());
+    const resolved = resolveItemFontFields(item, lookup);
+    if (resolved > 0) return resolved;
+    const label = unresolvedFontLabel(item);
+    if (label) {
+      fontStore.log(`未识别字体名称「${label}」，请在 font_info.cfg 中确认或点击「更新字体」同步。`);
+    }
     return toNum(item.font ?? item.Font ?? item.font_id ?? item.FontId, 0);
   }
 
