@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-06-12T11:13:47.900Z",
+  "generatedAt": "2026-06-13T09:32:46.079Z",
   "sourceFile": "public/font/font_info.cfg",
   "summary": {
-    "count": 11,
-    "vectorTtfCount": 4,
+    "count": 12,
+    "vectorTtfCount": 5,
     "imageGlyphCount": 7
   },
   "rulesForModels": [
@@ -24,14 +24,15 @@
     18,
     20,
     22,
-    24
+    24,
+    28
   ],
   "fonts": [
     {
       "id": 2,
       "type": 1,
       "typeLabel": "vector_ttf",
-      "name": "",
+      "name": "OPPO Sans-Blod",
       "url": "group1/M00/13/3E/rBAAM2lCSB6EbhI1AAAAAMlEn4Q308.ttf",
       "charsetLength": 0,
       "charsetPreview": ""
@@ -40,7 +41,7 @@
       "id": 6,
       "type": 1,
       "typeLabel": "vector_ttf",
-      "name": "Font 6",
+      "name": "005-OPPOSans Heavy",
       "url": "group1/M00/0B/81/Ci0s8WlCSQiEVK42AAAAAOGpc3k989.ttf",
       "charsetLength": 0,
       "charsetPreview": ""
@@ -49,7 +50,7 @@
       "id": 8,
       "type": 1,
       "typeLabel": "vector_ttf",
-      "name": "Font 8",
+      "name": "DS-Digital Bold",
       "url": "group1/M00/13/3E/rBAAM2lCSw-EJaE2AAAAAN1tBMI046.ttf",
       "charsetLength": 0,
       "charsetPreview": ""
@@ -58,7 +59,7 @@
       "id": 10,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 10",
+      "name": "22*39数字(时间日期)白色方块字体",
       "url": "group1/M00/13/92/rBAAM2lKYOWEG-I-AAAAAGe1Lrw93.webp",
       "charsetLength": 10,
       "charsetPreview": "0123456789"
@@ -67,7 +68,7 @@
       "id": 12,
       "type": 1,
       "typeLabel": "vector_ttf",
-      "name": "Font 12",
+      "name": "Bebas Neue",
       "url": "group1/M00/0B/E1/Ci0s8WlLn4yEaIJ8AAAAAAPGbuY077.otf",
       "charsetLength": 0,
       "charsetPreview": ""
@@ -76,7 +77,7 @@
       "id": 14,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 14",
+      "name": "26*48数字（比分）白色方块字体",
       "url": "group1/M00/0D/23/Ci0s8WlopBGEPKP-AAAAAHdAdM882.webp",
       "charsetLength": 10,
       "charsetPreview": "0123456789"
@@ -85,7 +86,7 @@
       "id": 16,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 16",
+      "name": "56*112数字/字符",
       "url": "group1/M00/15/14/rBAAM2lwePKEaQSSAAAAAE-bZFQ40.webp",
       "charsetLength": 14,
       "charsetPreview": "0123456789km.$"
@@ -94,7 +95,7 @@
       "id": 18,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 18",
+      "name": "54*76数字-neno",
       "url": "group1/M00/15/2B/rBAAM2l0PoyESZ5-AAAAABkVTK820.webp",
       "charsetLength": 11,
       "charsetPreview": "0123456789."
@@ -103,7 +104,7 @@
       "id": 20,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 20",
+      "name": "40*68大写字母字体-白色（26个）",
       "url": "group1/M00/15/2C/rBAAM2l0YAOEK5rcAAAAAOemuSs40.webp",
       "charsetLength": 26,
       "charsetPreview": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -112,7 +113,7 @@
       "id": 22,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 22",
+      "name": "44*76数字-黄色",
       "url": "group1/M00/0D/75/Ci0s8Wl0YIOEf9TKAAAAAPUHfBM24.webp",
       "charsetLength": 11,
       "charsetPreview": "0123456789."
@@ -121,10 +122,19 @@
       "id": 24,
       "type": 0,
       "typeLabel": "image_glyph",
-      "name": "Font 24",
+      "name": "56*112数字-白色",
       "url": "group1/M00/15/2D/rBAAM2l0gniESsHTAAAAAE-bZFQ86.webp",
       "charsetLength": 14,
       "charsetPreview": "0123456789KM.$"
+    },
+    {
+      "id": 28,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "OPPOSans Medium",
+      "url": "group1/M00/19/36/rBAAM2os0XeEPpH-AAAAAJOW9TA175.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
     }
   ]
 }
