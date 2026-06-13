@@ -19,7 +19,7 @@ import {
   BUNDLED_STARTER_WATCHFACE_ID
 } from "./localWatchfacesStore.js";
 import { resolveCdnFetchUrl } from "./cdnAssets.js";
-import { isDevSyncApiAvailable, saveClassifyCacheViaApi } from "./devSyncApi.js";
+import { isDevSyncApiAvailable, saveClassifyCacheViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
 import { createDivoomChinaStoreJson } from "./divoomCloudApi.js";
 import { buildDivoomLanEnvelope } from "./divoomLanJson.js";
 import {
@@ -1812,7 +1812,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
           id,
           type: toNum(item.type ?? item.Type, prev.type ?? 1),
           url: String(item.url ?? item.Url ?? prev.url ?? ""),
-          charset: String(item.charset ?? item.Charset ?? prev.charset ?? ""),
+          charset: String(item.charset ?? item.charSet ?? item.Charset ?? prev.charset ?? ""),
           name: String(item.name ?? item.Name ?? item.NameEn ?? item.NameCn ?? prev.name ?? "")
         };
         this.fontMeta.set(id, merged);
@@ -5346,6 +5346,21 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     dom.fontPendingDialog?.close?.();
   }
 
+  async function applyMergedFontInfoFromStore(mergedFontInfo) {
+    if (!mergedFontInfo?.FontList?.length) return;
+    const apiOk = await isDevSyncApiAvailable();
+    if (apiOk) {
+      try {
+        await writeFontInfoViaApi(mergedFontInfo);
+      } catch (e) {
+        fontStore.log(`font_info.cfg 写入失败: ${errorToText(e)}`);
+      }
+    }
+    fontStore.parseFontListLike(mergedFontInfo);
+    refreshFontPreviewSelect();
+    rebuildItemEditor();
+  }
+
   function notifyFontLibraryUpToDate() {
     closeFontPendingDialog();
     showLanCenteredMessage(t("font.pending.noneUpToDate"));
@@ -5384,11 +5399,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     refreshFontSyncButtonUi();
 
     try {
-      const { items } = await scanPendingFontsFromStore({
+      const { items, mergedFontInfo } = await scanPendingFontsFromStore({
         storeJson: divoomStoreJson,
         loadFontInfo: loadFontInfoJsonForSync,
         checkFontFileExists: checkLocalFontBinExists
       });
+      await applyMergedFontInfoFromStore(mergedFontInfo);
       if (!items.length) {
         pendingFontState.items = [];
         pendingFontState.savedAt = "";
@@ -7211,14 +7227,18 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     for (const meta of metas) {
       const opt = document.createElement("option");
       opt.value = String(meta.id);
-      opt.textContent = `${meta.id} ${toNum(meta.type, 1) === 0 ? "[IMG]" : "[TTF]"} ${meta.name || `(${t("common.unnamed")})`}`;
+      const typeTag = toNum(meta.type, 1) === 0 ? "[IMG]" : "[TTF]";
+      const label = meta.name || t("common.unnamed");
+      opt.textContent = `${label} (#${meta.id}) ${typeTag}`;
       if (meta.id === currentId) hasCurrent = true;
       select.appendChild(opt);
     }
     if (!hasCurrent) {
       const opt = document.createElement("option");
       opt.value = String(currentId);
-      opt.textContent = t("font.select.unknownCurrent", { id: currentId });
+      const meta = fontStore.getMeta(currentId);
+      const label = meta?.name || t("font.select.unknownCurrent", { id: currentId });
+      opt.textContent = meta?.name ? `${meta.name} (#${currentId})` : label;
       select.appendChild(opt);
     }
     select.value = String(currentId);

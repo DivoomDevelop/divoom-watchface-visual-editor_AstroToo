@@ -70,7 +70,8 @@ export async function scanPendingFontsFromStore({ storeJson, loadFontInfo, check
   }
 
   items.sort((a, b) => a.id - b.id);
-  return { items, remoteTotal: remoteList.length };
+  const mergedFontInfo = mergeFontInfoEntries(localInfo, remoteList);
+  return { items, remoteTotal: remoteList.length, mergedFontInfo };
 }
 
 /**
