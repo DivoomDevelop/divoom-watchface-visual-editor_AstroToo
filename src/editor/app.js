@@ -48,6 +48,13 @@ import {
   isWatchfaceDirectoryExportSupported
 } from "./watchfaceExport.js";
 import {
+  buildPublicAssetLookupPaths,
+  collectImportAssetLeaves,
+  parseWatchfaceImportJson,
+  prepareConfigForLocalImport,
+  resolveImportFileForLeaf
+} from "./watchfaceImport.js";
+import {
   classifyCatalogNeedsNameEnrichment,
   downloadSingleTemplateToLocal,
   enrichClassifyCatalogNames,
@@ -2146,6 +2153,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     templateDownloadStatus: byId("template-download-status"),
     browseTemplateToolbarHint: byId("browse-template-toolbar-hint"),
     btnNewWatchface: byId("btn-new-watchface"),
+    btnImportWatchface: byId("btn-import-watchface"),
+    inputImportWatchfaceJson: byId("input-import-watchface-json"),
     localWatchHint: byId("local-watch-hint"),
     localWatchfaceList: byId("local-watchface-list"),
     secCanvasTitle: byId("sec-canvas-title"),
@@ -2848,6 +2857,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     setNodeText(dom.secEditorTitle, t("ui.sec.editor"));
 
     if (dom.btnNewWatchface) setNodeText(dom.btnNewWatchface, t("ui.btn.newWatchface"));
+    if (dom.btnImportWatchface) {
+      setNodeText(dom.btnImportWatchface, t("ui.btn.importWatchface"));
+      dom.btnImportWatchface.setAttribute("aria-label", t("ui.btn.importWatchfaceAria"));
+    }
     setNodeText(dom.lblTemplateCategory, t("ui.sec.templateCategory"));
     if (dom.appModeStrip) dom.appModeStrip.setAttribute("aria-label", t("ui.aria.appModeTabs"));
     if (dom.templateCategoryRail) dom.templateCategoryRail.setAttribute("aria-label", t("ui.aria.templateCategoryRail"));
@@ -3436,12 +3449,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       const applyTpl = mode === "apply_template";
       const newWatchface = mode === "new_watchface";
       const duplicateWatchface = mode === "duplicate_watchface";
+      const importWatchface = mode === "import_watchface";
 
       if (dom.localSaveNamedLater)
-        dom.localSaveNamedLater.hidden = blocking || applyTpl || newWatchface || duplicateWatchface;
+        dom.localSaveNamedLater.hidden =
+          blocking || applyTpl || newWatchface || duplicateWatchface || importWatchface;
       if (dom.localSaveNamedDiscard) dom.localSaveNamedDiscard.hidden = !blocking;
       if (dom.localSaveNamedCancel)
-        dom.localSaveNamedCancel.hidden = !(blocking || applyTpl || newWatchface || duplicateWatchface);
+        dom.localSaveNamedCancel.hidden =
+          !(blocking || applyTpl || newWatchface || duplicateWatchface || importWatchface);
 
       if (blocking) {
         setNodeText(dom.localSaveNamedTitle, t("localWatch.dialog.titleBlocking"));
@@ -3462,6 +3478,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         setNodeText(dom.localSaveNamedTitle, t("localWatch.dialog.titleDuplicate"));
         const srcNm = context?.sourceName ? String(context.sourceName) : "";
         setNodeText(dom.localSaveNamedBody, t("localWatch.dialog.bodyDuplicate", { name: srcNm }));
+      } else if (importWatchface) {
+        setNodeText(dom.localSaveNamedTitle, t("localWatch.dialog.titleImport"));
+        setNodeText(dom.localSaveNamedBody, t("localWatch.dialog.bodyImport"));
       } else {
         setNodeText(dom.localSaveNamedTitle, t("localWatch.dialog.titleFirst"));
         setNodeText(dom.localSaveNamedBody, t("localWatch.dialog.bodyFirst"));
@@ -3480,8 +3499,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       );
 
       if (dom.localSaveNamedInput) {
-        dom.localSaveNamedInput.value =
-          newWatchface || duplicateWatchface ? "" : getClockDisplayName(state.config) || "";
+        const preset =
+          importWatchface && context?.defaultName
+            ? String(context.defaultName)
+            : newWatchface || duplicateWatchface
+              ? ""
+              : getClockDisplayName(state.config) || "";
+        dom.localSaveNamedInput.value = preset;
       }
       dom.localSaveNamedDialog?.showModal();
       window.requestAnimationFrame(() => {
@@ -3952,6 +3976,181 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       alert(t("localWatch.export.failed", { message: errorToText(e) }));
       fontStore.log(t("localWatch.export.failed", { message: errorToText(e) }));
     }
+  }
+
+  function importWatchfaceErrorMessage(err) {
+    const code = String(err?.message || err || "");
+    if (code === "json_not_found") return t("localWatch.import.noJson");
+    if (code === "missing_item_list") return t("localWatch.import.invalidJson", { message: "ItemList" });
+    if (code === "invalid_json") return t("localWatch.import.invalidJson", { message: "JSON" });
+    return t("localWatch.import.failed", { message: errorToText(err) });
+  }
+
+  async function loadImportedAssetLeaf(leaf, fileMap) {
+    const name = basename(String(leaf || "").trim());
+    if (!name) return null;
+    const picked = resolveImportFileForLeaf(name, fileMap);
+    if (picked) {
+      try {
+        return await loadLocalAssetFromFile(picked);
+      } catch {
+        return null;
+      }
+    }
+    for (const rel of buildPublicAssetLookupPaths(name)) {
+      try {
+        return await loadLocalAssetFromUrl(withBase(rel), name);
+      } catch {
+        // try next path
+      }
+    }
+    return null;
+  }
+
+  async function hydrateImportedWatchfaceAssets(config, fileMap) {
+    const leaves = collectImportAssetLeaves(config);
+    const missing = [];
+    let loaded = 0;
+
+    const bgLeaf = String(config?.DeviceImageUrl || "").trim();
+    if (bgLeaf && !/^https?:\/\//i.test(bgLeaf)) {
+      const asset = await loadImportedAssetLeaf(bgLeaf, fileMap);
+      if (asset) {
+        setBackgroundFromAsset(asset);
+        state.backgroundName = asset.name || basename(bgLeaf);
+        state.backgroundSourceLabel = asset.fromLocalPick
+          ? t("ui.bg.localFileHint", { name: state.backgroundName })
+          : String(asset.sourceUrl || state.backgroundName);
+        if (state.config && typeof state.config === "object") {
+          state.config.DeviceImageUrl = state.backgroundName;
+        }
+        loaded += 1;
+      } else {
+        missing.push(bgLeaf);
+      }
+    }
+
+    const appLeaf = String(config?.AppImageUrl || "").trim();
+    if (appLeaf && !/^https?:\/\//i.test(appLeaf)) {
+      const asset = await loadImportedAssetLeaf(appLeaf, fileMap);
+      if (asset) {
+        setAppPreviewFromAsset(asset);
+        state.appPreviewName = asset.name || basename(appLeaf);
+        state.appPreviewSourceLabel = asset.fromLocalPick
+          ? t("ui.bg.localFileHint", { name: state.appPreviewName })
+          : String(asset.sourceUrl || state.appPreviewName);
+        if (state.config && typeof state.config === "object") {
+          state.config.AppImageUrl = state.appPreviewName;
+        }
+        loaded += 1;
+      } else {
+        missing.push(appLeaf);
+      }
+    }
+
+    for (const item of state.config?.ItemList || []) {
+      if (!isTemplateImageItem(item)) continue;
+      const addr = String(item?.image_addr || "").trim();
+      if (!addr || /^https?:\/\//i.test(addr)) continue;
+      const asset = await loadImportedAssetLeaf(addr, fileMap);
+      if (asset) {
+        setLocalDispAsset(item, asset);
+        item.image_addr = asset.name || basename(addr);
+        loaded += 1;
+      } else {
+        missing.push(addr);
+      }
+    }
+
+    refreshBackgroundSourceLabel();
+    refreshAppPreviewSourceLabel();
+    return { loaded, missing, total: leaves.length };
+  }
+
+  async function finalizeImportedWatchface(config, hydrateResult) {
+    const defaultName = String(config?.NameCn || config?.NameEn || "").trim();
+    const r = await openLocalSaveNamedDialog({
+      mode: "import_watchface",
+      context: { defaultName }
+    });
+    if (r.action !== "save") return false;
+    const nm = String(r.name || defaultName || "").trim();
+    if (!nm) {
+      alert(t("lan.err.emptyName"));
+      return false;
+    }
+
+    sidebarBrowseMode = "local";
+    templateState.activeClockId = null;
+    refreshSidebarBrowseChrome();
+    refreshTemplateListUi();
+    namingPromptDismissed = true;
+    activeLocalWatchfaceId = "";
+
+    state.config.NameCn = nm;
+    state.config.NameEn = nm;
+    dom.txtClockTitle.textContent = nm;
+    refreshToolbarClockIdUi();
+
+    await persistNewNamedWatchface(nm);
+    rebuildItemEditor();
+    renderWatchface();
+    applyCanvasZoom();
+
+    const { loaded, missing, total } = hydrateResult;
+    const msg =
+      missing.length > 0
+        ? t("localWatch.import.done", { name: nm, loaded, missing: missing.length })
+        : t("localWatch.import.doneAll", { name: nm, loaded });
+    alert(msg);
+    fontStore.log(t("localWatch.import.log", { name: nm, loaded, total: total || loaded }));
+    if (missing.length) {
+      fontStore.log(t("localWatch.import.missingList", { list: missing.slice(0, 12).join(", ") }));
+    }
+    return true;
+  }
+
+  async function importWatchfaceFromPayload({ jsonText, fileMap }) {
+    let raw;
+    try {
+      raw = parseWatchfaceImportJson(jsonText);
+    } catch (err) {
+      alert(importWatchfaceErrorMessage(err));
+      return;
+    }
+
+    const config = prepareConfigForLocalImport(raw);
+    clearBackgroundObjectUrl();
+    state.backgroundImage = null;
+    state.backgroundName = "";
+    state.backgroundSourceLabel = "";
+    if (dom.inputBgFile) dom.inputBgFile.value = "";
+    clearAppPreviewState();
+
+    applyConfig(config, t("localWatch.importBtn"));
+    const hydrateResult = await hydrateImportedWatchfaceAssets(config, fileMap);
+    await finalizeImportedWatchface(config, hydrateResult);
+    refreshLocalWatchfaceListUi();
+  }
+
+  async function importWatchfaceFromJsonFile(file) {
+    if (!file) return;
+    const jsonText = await file.text();
+    await importWatchfaceFromPayload({ jsonText, fileMap: new Map() });
+  }
+
+  async function startImportWatchface() {
+    if (sidebarBrowseMode === "template") return;
+    const ok = await ensureWorkspaceHandledBeforeSwitch("import");
+    if (!ok) return;
+
+    if (dom.inputImportWatchfaceJson) {
+      dom.inputImportWatchfaceJson.value = "";
+      dom.inputImportWatchfaceJson.click();
+      return;
+    }
+
+    alert(t("localWatch.import.unsupported"));
   }
 
   function refreshLocalWatchfaceListUi() {
@@ -8423,6 +8622,22 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (dom.btnNewWatchface) {
       dom.btnNewWatchface.addEventListener("click", () => {
         void startNewBlankWatchface();
+      });
+    }
+
+    if (dom.btnImportWatchface) {
+      dom.btnImportWatchface.addEventListener("click", () => {
+        void startImportWatchface();
+      });
+    }
+
+    if (dom.inputImportWatchfaceJson) {
+      dom.inputImportWatchfaceJson.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        void importWatchfaceFromJsonFile(file).finally(() => {
+          if (dom.inputImportWatchfaceJson) dom.inputImportWatchfaceJson.value = "";
+        });
       });
     }
 
