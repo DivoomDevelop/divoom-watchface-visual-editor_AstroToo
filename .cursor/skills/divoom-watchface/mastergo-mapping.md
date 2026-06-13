@@ -14,8 +14,8 @@ https://mastergo.com/file/{fileId}?...&layer_id={layerId}
 1. `mcp__getDesignSections` 无 `sectionIndex` → 概览  
 2. `sectionIndex=0..N-1` 分批（每批 3–5）  
 3. 需要绝对坐标时用 `mcp__getDsl` 一次取整树（含 `relativeX/Y`）  
-4. 矢量装饰：`mcp__extractSvg` → PNG  
-5. 位图 URL：DSL `styles.paint_*.value[].url` → curl 下载  
+4. 矢量装饰：`mcp__extractSvg` → 栅格化 → **WebP**  
+5. 位图 URL：DSL `styles.paint_*.value[].url` → 下载（常为 PNG）→ **转 WebP 后**写入 `public/`
 
 ## 图层命名 → disp（导入脚本约定）
 
@@ -27,9 +27,9 @@ https://mastergo.com/file/{fileId}?...&layer_id={layerId}
 | `dyn/date` | `date_row` | 156 | TTF 2/6 |
 | `dyn/week` | `week_row` | 37 | TTF 2/6 |
 | `dyn/temp` | `temp_value` | 96 | TTF（含°） |
-| `img/weather` | `weather_icon` | 55 | PNG |
-| `img/wave` / 矢量组 | `wave_decor` | 48 | PNG |
-| 时针/分针/秒针 | `hand_h/m/s` | 131/132/233 | PNG 方形 |
+| `img/weather` | `weather_icon` | 55 | WebP |
+| `img/wave` / 矢量组 | `wave_decor` | 48 | WebP |
+| 时针/分针/秒针 | `hand_h/m/s` | 131/132/233 | WebP 方形 |
 
 命名不标准时按 TEXT 内容 + 位置启发式推断，并在 JSON `item_id` 写清。
 
@@ -130,20 +130,32 @@ MasterGo `font.size` **丢弃**，JSON：
 
 ## 资源文件命名
 
+**交付格式：全部为 WebP。** MasterGo 下载或 SVG 栅格化得到的 PNG/JPG 只是中间产物，提交前必须转换。
+
 | 用途 | JSON 字段 | 文件示例 |
 |------|-----------|----------|
-| 背景 | `DeviceImageUrl` | `dial_bg.png` |
-| 元素图 | `ItemList[].image_addr` | `weather.png` |
+| 背景 | `DeviceImageUrl` | `dial_bg.webp` |
+| 元素图 | `ItemList[].image_addr` | `weather_icon.webp` |
+| App 预览 | `AppImageUrl` | `app_preview.webp` |
 
 放置：
 
-- `public/<leaf>` — 导入时 HTTP 加载  
-- `docs/examples/<project>/assets/` — 源文件归档  
+- `public/<leaf>.webp` — 导入时 HTTP 加载  
+- `docs/examples/<project>/assets/<leaf>.webp` — 源文件归档  
+
+**转换示例：**
+
+```bash
+cwebp -q 90 clock_bg.png -o dial_bg.webp
+cwebp -lossless wave_decor.png -o wave_decor.webp
+```
+
+JSON 中扩展名必须与磁盘文件一致（`.webp`，不要写 `.png`）。
 
 ## 不可 1:1 项（设计时规避）
 
-- CSS/MG `box-shadow`、外发光 → 烤进 PNG 或删除  
-- MG 矢量动态字（非系统 font）→ TTF 或 PNG  
+- CSS/MG `box-shadow`、外发光 → 烤进 **WebP** 或删除  
+- MG 矢量动态字（非系统 font）→ TTF 或 WebP  
 - MG fontSize > h 且坚持 TTF → 必须压 size  
 - 位图字冒号、中文、小写字母 → charset 外字符  
 
@@ -155,7 +167,7 @@ MasterGo `font.size` **丢弃**，JSON：
 | 温度 | 344,203,100,57 | 66 | font **2**, size **56**, disp **96** |
 | 日期 | 83,301,125,26 | 30 | font **2**, size **26**, disp **156** |
 | 星期 | 259,301,76,26 | 30 | font **2**, size **26**, disp **37** |
-| 天气 | 363,293,63,62 | — | disp **55**, PNG |
-| 波形 | 50,367,289,44 | — | disp **48**, PNG |
+| 天气 | 363,293,63,62 | — | disp **55**, **WebP** |
+| 波形 | 50,367,289,44 | — | disp **48**, **WebP** |
 
 若坚持用 font 24 数码风格：时间改用 disp 3+2，且 w/h 按编辑器实测，size=0。
