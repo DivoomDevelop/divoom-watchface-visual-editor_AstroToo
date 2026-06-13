@@ -18,6 +18,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "gen:ai-docs": "node scripts/gen-ai-docs.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
+    "install:git-hooks": "node scripts/install-git-hooks.mjs",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "lan:probe": "node scripts/lan-probe.mjs"
   },
   "devDependencies": {

@@ -88,7 +88,7 @@ const jaJP = Object.freeze({
     "Divoom ウォッチフェイスのブラウザ上プレビュー・編集ツールです。「マイデザイン」の変更はこのブラウザのローカルに保存されます。",
   "about.dblhint": "下の領域をダブルクリックすると管理者パスワードのダイアログが開きます。",
   "about.dblAria": "管理者用入口（ダブルクリック）",
-  "about.versionLine": "ビルド: {tag}",
+  "about.versionLine": "バージョン: {version}",
   "about.close": "閉じる",
   "about.adminBadge": "管理者",
   "about.adminExit": "管理者モードを終了",

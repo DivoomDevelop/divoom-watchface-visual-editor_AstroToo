@@ -75,7 +75,7 @@ const zhTW = Object.freeze({
   "log.sampleLoadFailed": "示例設定讀取失敗，請用「載入錶盤設定(JSON)」手動匯入。",
   "log.configExported": "已匯出設定：{name}",
   "log.backgroundLoaded": "底圖已載入：{name}",
-  "log.uiBuildVersion": "UI 建置版本：{tag}"
+  "log.uiBuildVersion": "UI 建置版本：{version}"
 });
 
 export default zhTW;

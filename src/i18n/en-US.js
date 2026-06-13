@@ -76,7 +76,7 @@ const enUS = Object.freeze({
     "Divoom watchface preview and editing in the browser. Changes to My designs are stored locally in this browser.",
   "about.dblhint": "Double-click the area below to open the administrator password dialog.",
   "about.dblAria": "Administrator entry (double-click)",
-  "about.versionLine": "Build: {tag}",
+  "about.versionLine": "Version: {version}",
   "about.close": "Close",
   "about.adminBadge": "Admin",
   "about.adminExit": "Exit administrator mode",
@@ -359,7 +359,7 @@ const enUS = Object.freeze({
   "log.backgroundLoaded": "Background loaded: {name}",
   "log.appPreviewLoaded": "APP preview image loaded: {name}",
   "alert.appPreviewLoadFailed": "Failed to load APP preview image",
-  "log.uiBuildVersion": "UI build version: {tag}",
+  "log.uiBuildVersion": "UI build version: {version}",
   "log.bundledStarterSeeded": "Seeded default My designs entry: {name}."
 });
 

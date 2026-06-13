@@ -24,6 +24,7 @@ import {
   resolveItemFontFields,
   unresolvedFontLabel
 } from "./fontResolve.js";
+import { APP_BUILD_NUMBER } from "./appVersion.js";
 import { isDevSyncApiAvailable, saveClassifyCacheViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
 import { createDivoomChinaStoreJson } from "./divoomCloudApi.js";
 import { buildDivoomLanEnvelope } from "./divoomLanJson.js";
@@ -72,7 +73,6 @@ import {
 const BASE_URL = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
 const withBase = (rel) => BASE_URL + String(rel || "").replace(/^\//, "");
 
-const APP_BUILD_TAG = "2026-06-07 AstroToo";
 /** AstroToo 表盘逻辑分辨率（方形屏）。 */
 const EDITOR_CANVAS_WIDTH = 480;
 const EDITOR_CANVAS_HEIGHT = 480;
@@ -2727,7 +2727,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (dom.aboutTitle) setNodeText(dom.aboutTitle, t("about.title"));
     if (dom.aboutIntro) setNodeText(dom.aboutIntro, t("about.intro"));
     if (dom.aboutDblhint) setNodeText(dom.aboutDblhint, t("about.dblhint"));
-    if (dom.aboutVersionLine) setNodeText(dom.aboutVersionLine, t("about.versionLine", { tag: APP_BUILD_TAG }));
+    if (dom.aboutVersionLine) setNodeText(dom.aboutVersionLine, t("about.versionLine", { version: APP_BUILD_NUMBER }));
     if (dom.aboutDoubleclickZone)
       dom.aboutDoubleclickZone.setAttribute("aria-label", t("about.dblAria"));
     if (dom.btnAbout) setNodeText(dom.btnAbout, t("about.open"));
@@ -3929,7 +3929,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       fetchPublicFile: fetchPublicFileForExport,
       fetchTemplateAsset: fetchTemplateAssetForExport,
       fetchLiveItemAsset,
-      editorMeta: { build: APP_BUILD_TAG }
+      editorMeta: { build: APP_BUILD_NUMBER }
     };
   }
 
@@ -6129,7 +6129,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     try {
       window.__DIVOOM_LAN_DEBUG__ = {
         exportedAt: new Date().toISOString(),
-        build: APP_BUILD_TAG,
+        build: APP_BUILD_NUMBER,
         history: lanDebugHistory.slice()
       };
     } catch {
@@ -6169,7 +6169,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   function buildLanDiagnosticsText() {
     const lines = [
       "=== Divoom watchface editor — LAN diagnostics ===",
-      `build: ${APP_BUILD_TAG}`,
+      `build: ${APP_BUILD_NUMBER}`,
       `page: ${typeof location !== "undefined" ? location.href : ""}`,
       `verbose: ${isLanVerboseDebug() ? "on" : `off (set localStorage '${LAN_DEBUG_STORAGE_VERBOSE}'='1' or add ?lanDebug=1, reload)`}`,
       `editor ClockId: ${toNum(state.config?.ClockId, 0)} | ItemList len: ${state.config?.ItemList?.length ?? 0}`,
@@ -8834,7 +8834,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     applyCanvasZoom();
     refreshFontPreviewSelect();
     refreshTemplateListUi();
-    fontStore.log(t("log.uiBuildVersion", { tag: APP_BUILD_TAG }));
+    fontStore.log(t("log.uiBuildVersion", { version: APP_BUILD_NUMBER }));
     refreshBackgroundSourceLabel();
     refreshAppPreviewSourceLabel();
     refreshWatchDescFields();

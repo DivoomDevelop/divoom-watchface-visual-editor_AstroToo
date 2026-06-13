@@ -75,7 +75,7 @@ const zhCN = Object.freeze({
   "about.intro": "Divoom 表盘在浏览器中的预览与编辑工具。「我的设计」的修改会保存在本机浏览器的本地存储中。",
   "about.dblhint": "在下方区域双击可打开管理员密码对话框。",
   "about.dblAria": "管理员入口（双击）",
-  "about.versionLine": "构建版本：{tag}",
+  "about.versionLine": "版本号：{version}",
   "about.close": "关闭",
   "about.adminBadge": "管理员",
   "about.adminExit": "退出管理员模式",
@@ -354,7 +354,7 @@ const zhCN = Object.freeze({
   "log.backgroundLoaded": "底图已加载: {name}",
   "log.appPreviewLoaded": "APP预览图已加载: {name}",
   "alert.appPreviewLoadFailed": "APP预览图加载失败",
-  "log.uiBuildVersion": "UI构建版本: {tag}",
+  "log.uiBuildVersion": "UI构建版本: {version}",
   "log.bundledStarterSeeded": "已写入默认「我的设计」条目：{name}。"
 });
 
