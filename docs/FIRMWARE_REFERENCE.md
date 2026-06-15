@@ -48,6 +48,7 @@ z:\allwinner\TimeFrameSpeaker\tina_t113_v5.0_speaker\platform\thirdparty\gui\lvg
 | `Device/GetClockInfoV3` | 表盘完整配置 | `templateSync.js` | 中国区服务器 |
 | `Device/GetSomeFontInfoV2` | 按 ID 拉取字体元数据 | `fontSync.js` | LAN 设备 |
 | `Device/GetTimeDialFontV2` | 全量字体目录 | `fontCloudSync.js` | 中国区服务器 |
+| `Device/GetDispItemList` | 显示元素分类与名称 | `dispCloudSync.js` | 中国区服务器 |
 
 ## 本地资源布局（与固件命名对齐）
 

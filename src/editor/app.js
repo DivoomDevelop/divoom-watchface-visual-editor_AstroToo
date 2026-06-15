@@ -25,13 +25,15 @@ import {
   unresolvedFontLabel
 } from "./fontResolve.js";
 import { APP_BUILD_NUMBER } from "./appVersion.js";
-import { isDevSyncApiAvailable, saveClassifyCacheViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
+import { isDevSyncApiAvailable, saveClassifyCacheViaApi, writeDispInfoViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
 import { createDivoomChinaStoreJson } from "./divoomCloudApi.js";
 import { buildDivoomLanEnvelope } from "./divoomLanJson.js";
 import {
   downloadSelectedFontsToLocal,
   scanPendingFontsFromStore
 } from "./fontCloudSync.js";
+import { dispCatalogToCfgShape, fetchDispItemList } from "./dispCloudSync.js";
+import { DispCatalogStore } from "./dispCatalogStore.js";
 import {
   countPendingFontItems,
   loadPendingFontCacheFromStorage,
@@ -2368,6 +2370,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   function dispComment(disp) {
     const id = toNum(disp, NaN);
     if (!Number.isFinite(id)) return "";
+    const fromCatalog = dispCatalogStore.getDisplayName(id);
+    if (fromCatalog) return fromCatalog;
     const zhText = String(DISP_COMMENT_ZH_MAP[id] || "").trim();
     const locale = String(getLocaleCode() || "").toLowerCase();
     if (locale.startsWith("zh")) {
@@ -2785,6 +2789,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     btnSyncTemplates: byId("btn-sync-templates"),
     btnViewPendingFonts: byId("btn-view-pending-fonts"),
     btnSyncFonts: byId("btn-sync-fonts"),
+    btnSyncDisp: byId("btn-sync-disp"),
     fontPendingDialog: byId("font-pending-dialog"),
     fontPendingTitle: byId("font-pending-title"),
     fontPendingHint: byId("font-pending-hint"),
@@ -3255,6 +3260,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
   );
 
+  const dispCatalogStore = new DispCatalogStore(getLocaleCode, () => {
+    refreshItemListUi();
+    rebuildItemEditor();
+  });
+
+  let dispCatalogSyncing = false;
+
   const editorFields = [
     { key: "item_id", type: "text", labelKey: "editor.itemId", full: true },
     { key: "info", type: "text", labelKey: "editor.info", full: true },
@@ -3491,6 +3503,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (dom.btnSyncFonts) {
       setNodeText(dom.btnSyncFonts, t("font.btn.sync"));
       dom.btnSyncFonts.title = t("font.btn.syncTitle");
+    }
+    if (dom.btnSyncDisp) {
+      setNodeText(dom.btnSyncDisp, t("disp.btn.sync"));
+      dom.btnSyncDisp.title = t("disp.btn.syncTitle");
     }
     if (dom.fontPendingTitle) setNodeText(dom.fontPendingTitle, t("font.pending.title"));
     if (dom.btnFontPendingSelectAll) setNodeText(dom.btnFontPendingSelectAll, t("font.pending.selectAll"));
@@ -5413,6 +5429,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       setTemplateSyncStatusText("");
     }
     refreshFontSyncButtonUi();
+    refreshDispSyncButtonUi();
   }
 
   function setTemplatePendingPanelVisible(on) {
@@ -5902,6 +5919,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     refreshViewPendingFontButtonUi();
   }
 
+  function refreshDispSyncButtonUi() {
+    const btn = dom.btnSyncDisp;
+    if (!btn) return;
+    const hasStoreDeviceId = resolveStoreApiDeviceId() > 0;
+    btn.disabled = dispCatalogSyncing || !hasStoreDeviceId;
+    setNodeText(btn, t("disp.btn.sync"));
+    btn.title = t("disp.btn.syncTitle");
+  }
+
   function pendingFontReasonLabel(reason) {
     if (reason === "file_missing") return t("font.pending.reasonFileMissing");
     if (reason === "outdated") return t("font.pending.reasonOutdated");
@@ -6172,6 +6198,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       dom.btnSyncFonts.addEventListener("click", () => {
         if (dom.btnSyncFonts.disabled) return;
         void openPendingFontPanel({ rescan: true });
+      });
+    }
+    if (dom.btnSyncDisp) {
+      dom.btnSyncDisp.addEventListener("click", () => {
+        if (dom.btnSyncDisp.disabled) return;
+        void syncDispCatalogFromStore();
       });
     }
     if (dom.btnFontPendingSelectAll) {
@@ -7905,33 +7937,67 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const select = document.createElement("select");
     select.dataset.key = "disp";
     const currentId = toNum(currentDisp, 0);
-    const dispEntries = Object.entries(DISP_NAME_MAP)
-      .map(([id, name]) => ({ id: toNum(id, NaN), name: String(name || "") }))
-      .filter((x) => Number.isFinite(x.id))
-      .sort((a, b) => a.id - b.id);
-
     let hasCurrent = false;
-    const groups = new Map();
-    for (const row of dispEntries) {
-      const category = dispCategoryKey(row.id, row.name);
-      if (!groups.has(category)) groups.set(category, []);
-      groups.get(category).push(row);
-      if (row.id === currentId) hasCurrent = true;
-    }
-    const orderedCats = DISP_CATEGORY_ORDER.filter((c) => groups.has(c));
-    const extraCats = [...groups.keys()].filter((c) => !DISP_CATEGORY_ORDER.includes(c)).sort();
-    for (const cat of [...orderedCats, ...extraCats]) {
-      const optgroup = document.createElement("optgroup");
-      const rows = groups.get(cat) || [];
-      optgroup.label = `${t(cat)} (${rows.length})`;
-      for (const row of rows) {
-        const opt = document.createElement("option");
-        opt.value = String(row.id);
-        opt.textContent = formatDispOptionText(row.id);
-        optgroup.appendChild(opt);
+
+    const appendDispOption = (optgroup, dispId) => {
+      const opt = document.createElement("option");
+      opt.value = String(dispId);
+      opt.textContent = formatDispOptionText(dispId);
+      const meta = dispCatalogStore.getMeta(dispId);
+      if (meta?.desc) opt.title = meta.desc;
+      optgroup.appendChild(opt);
+      if (dispId === currentId) hasCurrent = true;
+    };
+
+    if (dispCatalogStore.hasCatalog() && dispCatalogStore.classifyList.length) {
+      const catalogIds = new Set();
+      for (const cls of dispCatalogStore.classifyList) {
+        const rows = (cls.dispItemList || []).slice().sort((a, b) => a.id - b.id);
+        if (!rows.length) continue;
+        const optgroup = document.createElement("optgroup");
+        const classifyLabel = dispCatalogStore.getClassifyLabel(cls);
+        optgroup.label = classifyLabel ? `${classifyLabel} (${rows.length})` : `(${rows.length})`;
+        for (const row of rows) {
+          catalogIds.add(row.id);
+          appendDispOption(optgroup, row.id);
+        }
+        select.appendChild(optgroup);
       }
-      select.appendChild(optgroup);
+
+      const extras = Object.entries(DISP_NAME_MAP)
+        .map(([id]) => toNum(id, NaN))
+        .filter((id) => Number.isFinite(id) && !catalogIds.has(id))
+        .sort((a, b) => a - b);
+      if (extras.length) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = `${t("disp.cat.other")} (${extras.length})`;
+        for (const id of extras) appendDispOption(optgroup, id);
+        select.appendChild(optgroup);
+      }
+    } else {
+      const dispEntries = Object.entries(DISP_NAME_MAP)
+        .map(([id, name]) => ({ id: toNum(id, NaN), name: String(name || "") }))
+        .filter((x) => Number.isFinite(x.id))
+        .sort((a, b) => a.id - b.id);
+
+      const groups = new Map();
+      for (const row of dispEntries) {
+        const category = dispCategoryKey(row.id, row.name);
+        if (!groups.has(category)) groups.set(category, []);
+        groups.get(category).push(row);
+        if (row.id === currentId) hasCurrent = true;
+      }
+      const orderedCats = DISP_CATEGORY_ORDER.filter((c) => groups.has(c));
+      const extraCats = [...groups.keys()].filter((c) => !DISP_CATEGORY_ORDER.includes(c)).sort();
+      for (const cat of [...orderedCats, ...extraCats]) {
+        const optgroup = document.createElement("optgroup");
+        const rows = groups.get(cat) || [];
+        optgroup.label = `${t(cat)} (${rows.length})`;
+        for (const row of rows) appendDispOption(optgroup, row.id);
+        select.appendChild(optgroup);
+      }
     }
+
     if (!hasCurrent) {
       const optgroup = document.createElement("optgroup");
       optgroup.label = t("disp.cat.currentValue");
@@ -9106,6 +9172,57 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     ctx.fillText(`id=${meta.id} type=${meta.type} ${charset}`, 12, 110);
   }
 
+  async function loadDispInfoJsonForSync() {
+    const paths = [withBase("disp/disp_info.cfg"), "disp/disp_info.cfg"];
+    try {
+      return await loadFirstJson(paths);
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadDispInfoCfg() {
+    try {
+      const data = await loadDispInfoJsonForSync();
+      if (data) dispCatalogStore.loadFromCfg(data);
+    } catch {
+      /* optional */
+    }
+  }
+
+  async function syncDispCatalogFromStore() {
+    if (!resolveStoreApiDeviceId()) {
+      alert(t("template.sync.needDeviceId"));
+      refreshDispSyncButtonUi();
+      return;
+    }
+    dispCatalogSyncing = true;
+    refreshDispSyncButtonUi();
+    try {
+      const remote = await fetchDispItemList(divoomStoreJson);
+      const local = await loadDispInfoJsonForSync();
+      const merged = dispCatalogStore.mergeRemote(remote, local);
+      const cfgShape = dispCatalogToCfgShape(merged);
+      const apiOk = await isDevSyncApiAvailable();
+      if (apiOk) {
+        try {
+          await writeDispInfoViaApi(cfgShape);
+        } catch (e) {
+          fontStore.log(t("disp.sync.writeFailed", { message: errorToText(e) }));
+        }
+      }
+      fontStore.log(t("disp.sync.done", { count: merged.DispList.length }));
+      showLanCenteredMessage(t("disp.sync.done", { count: merged.DispList.length }));
+    } catch (e) {
+      const msg = errorToText(e);
+      fontStore.log(t("disp.sync.failed", { message: msg }));
+      alert(t("disp.sync.failed", { message: msg }));
+    } finally {
+      dispCatalogSyncing = false;
+      refreshDispSyncButtonUi();
+    }
+  }
+
   async function loadFontInfoJsonForSync() {
     const paths = [withBase("font/font_info.cfg"), "font/font_info.cfg"];
     try {
@@ -9537,6 +9654,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       { once: true }
     );
     loadDefaultFontConfigs();
+    await loadDispInfoCfg();
     await loadTemplateClassifyCache();
     await loadTemplateConfigIds();
     await initPendingTemplateOnStartup();

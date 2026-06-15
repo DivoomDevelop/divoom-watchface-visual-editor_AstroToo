@@ -221,6 +221,12 @@ const enUS = Object.freeze({
   "font.pending.needDevServer": "Writing font files requires npm run dev on this machine.",
   "font.pending.noneSelected": "Select at least one font.",
 
+  "disp.btn.sync": "Update display elements",
+  "disp.btn.syncTitle": "Sync display element catalog from Divoom China store (Device/GetDispItemList); npm run dev required to write disp_info.cfg",
+  "disp.sync.done": "Updated {count} display element name(s).",
+  "disp.sync.failed": "Failed to update display elements: {message}",
+  "disp.sync.writeFailed": "Failed to write disp_info.cfg: {message}",
+
   "common.fontPrefix": "font:",
   "common.unnamed": "Unnamed",
 

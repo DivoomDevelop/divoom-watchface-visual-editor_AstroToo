@@ -42,7 +42,8 @@ const HTTP_RESPONE_UNPACK_STUBS = {
   "Channel/StoreClockGetListForDevice": { ClockList: [] },
   "Device/GetClockInfoV3": { DeviceImageUrl: "", ItemList: [] },
   "Device/GetSomeFontInfoV2": { FontList: [] },
-  "Device/GetTimeDialFontV2": { FontList: [] }
+  "Device/GetTimeDialFontV2": { FontList: [] },
+  "Device/GetDispItemList": { ClassifyList: [] }
 };
 
 /**

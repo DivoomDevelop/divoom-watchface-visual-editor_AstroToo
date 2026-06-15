@@ -66,3 +66,9 @@ export async function writeFontInfoViaApi(fontInfo) {
   const enc = new TextEncoder();
   return writeDevFileViaApi("font/font_info.cfg", enc.encode(text));
 }
+
+export async function writeDispInfoViaApi(dispInfo) {
+  const text = JSON.stringify(dispInfo, null, 2);
+  const enc = new TextEncoder();
+  return writeDevFileViaApi("disp/disp_info.cfg", enc.encode(text));
+}

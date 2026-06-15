@@ -220,6 +220,12 @@ const zhCN = Object.freeze({
   "font.pending.needDevServer": "写入字体文件需要在本机运行 npm run dev。",
   "font.pending.noneSelected": "请至少勾选一个字体。",
 
+  "disp.btn.sync": "更新显示元素",
+  "disp.btn.syncTitle": "从 Divoom 中国区服务器同步显示元素列表（Device/GetDispItemList）；写入需 npm run dev",
+  "disp.sync.done": "已更新 {count} 个显示元素名称。",
+  "disp.sync.failed": "更新显示元素失败：{message}",
+  "disp.sync.writeFailed": "disp_info.cfg 写入失败：{message}",
+
   "common.fontPrefix": "font:",
   "common.unnamed": "未命名",
 
