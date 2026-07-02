@@ -42,6 +42,26 @@ export async function writeDevFileViaApi(relPath, bytes) {
   return data;
 }
 
+export async function deleteDevFileViaApi(relPath) {
+  const path = String(relPath || "").replace(/\\/g, "/").replace(/^\/+/, "");
+  const res = await fetch("/api/template-sync/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json;charset=UTF-8" },
+    body: JSON.stringify({ relPath: path })
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    /* ignore */
+  }
+  if (!res.ok) {
+    throw new Error(String(data?.error || text || `delete failed (${res.status})`));
+  }
+  return data;
+}
+
 export async function saveClassifyCacheViaApi(classifyPayload) {
   const res = await fetch("/api/template-sync/classify", {
     method: "POST",

@@ -95,6 +95,8 @@ const enUS = Object.freeze({
   "editor.itemId": "Item Identifier (item_id)",
   "editor.info": "Description (info)",
   "editor.disp": "Display Type (disp)",
+  "editor.dispPickCategory": "Display category",
+  "editor.dispPickItem": "Select display element",
   "editor.font": "Font Selection (font)",
   "editor.previewText": "Mock Display Data (not exported)",
   "editor.size": "Font Size (size)",
@@ -222,8 +224,10 @@ const enUS = Object.freeze({
   "font.pending.noneSelected": "Select at least one font.",
 
   "disp.btn.sync": "Update display elements",
-  "disp.btn.syncTitle": "Sync display element catalog from Divoom China store (Device/GetDispItemList); npm run dev required to write disp_info.cfg",
+  "disp.btn.syncTitle": "Sync display element names from Divoom China store (Device/GetDispItemList); npm run dev required to write disp_info.cfg",
   "disp.sync.done": "Updated {count} display element name(s).",
+  "disp.sync.upToDate": "Display element names are up to date ({total} on cloud, no changes this sync).",
+  "disp.sync.changed": "Sync complete: {added} added, {updated} updated ({total} on cloud).",
   "disp.sync.failed": "Failed to update display elements: {message}",
   "disp.sync.writeFailed": "Failed to write disp_info.cfg: {message}",
 

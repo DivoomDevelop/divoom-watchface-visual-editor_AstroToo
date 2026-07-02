@@ -729,6 +729,23 @@ button:disabled {
   font-size: 12px;
 }
 
+.disp-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr);
+  gap: 6px;
+}
+
+.disp-picker-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .disp-picker-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .asset-file-editor {
   border: 1px dashed #3f5786;
   border-radius: 8px;

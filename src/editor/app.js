@@ -32,7 +32,7 @@ import {
   downloadSelectedFontsToLocal,
   scanPendingFontsFromStore
 } from "./fontCloudSync.js";
-import { dispCatalogToCfgShape, fetchDispItemList } from "./dispCloudSync.js";
+import { fetchDispItemList, summarizeDispCatalogSync } from "./dispCloudSync.js";
 import { DispCatalogStore } from "./dispCatalogStore.js";
 import {
   countPendingFontItems,
@@ -7933,82 +7933,122 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return select;
   }
 
-  function buildDispSelectForEditor(currentDisp) {
-    const select = document.createElement("select");
-    select.dataset.key = "disp";
-    const currentId = toNum(currentDisp, 0);
-    let hasCurrent = false;
+  function getAllDispIds() {
+    const ids = new Set(
+      Object.keys(DISP_NAME_MAP)
+        .map((id) => toNum(id, NaN))
+        .filter((id) => Number.isFinite(id))
+    );
+    for (const meta of dispCatalogStore.getAllMetas()) ids.add(meta.id);
+    return [...ids].sort((a, b) => a - b);
+  }
 
-    const appendDispOption = (optgroup, dispId) => {
+  function collectDispPickerGroups() {
+    /** @type {{ groupKey: string, label: string, dispIds: number[] }[]} */
+    const groups = [];
+    const catalogIds = new Set();
+
+    if (dispCatalogStore.hasCatalog() && dispCatalogStore.classifyList.length) {
+      for (const cls of dispCatalogStore.classifyList) {
+        const rows = (cls.dispItemList || []).slice().sort((a, b) => a.id - b.id);
+        const classifyLabel = dispCatalogStore.getClassifyLabel(cls);
+        groups.push({
+          groupKey: `cat-${cls.id}`,
+          label: classifyLabel ? `${classifyLabel} (${rows.length})` : `(${rows.length})`,
+          dispIds: rows.map((row) => row.id)
+        });
+        for (const row of rows) catalogIds.add(row.id);
+      }
+    }
+
+    const extras = getAllDispIds()
+      .filter((id) => !catalogIds.has(id))
+      .sort((a, b) => a - b);
+    if (extras.length) {
+      groups.push({
+        groupKey: "extras",
+        label: `${t("disp.cat.other")} (${extras.length})`,
+        dispIds: extras
+      });
+    }
+
+    return groups;
+  }
+
+  function findDispPickerGroup(groups, dispId) {
+    const meta = dispCatalogStore.getMeta(dispId);
+    if (meta?.classifyId) {
+      const fromClassify = groups.find((group) => group.groupKey === `cat-${meta.classifyId}`);
+      if (fromClassify) return fromClassify;
+    }
+    return groups.find((group) => group.dispIds.includes(dispId)) || null;
+  }
+
+  function fillDispItemSelect(select, dispIds, selectedId) {
+    select.replaceChildren();
+    const hasSelected = dispIds.includes(selectedId);
+    if (!hasSelected) {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = t("editor.dispPickItem");
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      select.appendChild(placeholder);
+    }
+    for (const dispId of dispIds) {
       const opt = document.createElement("option");
       opt.value = String(dispId);
       opt.textContent = formatDispOptionText(dispId);
       const meta = dispCatalogStore.getMeta(dispId);
       if (meta?.desc) opt.title = meta.desc;
-      optgroup.appendChild(opt);
-      if (dispId === currentId) hasCurrent = true;
-    };
-
-    if (dispCatalogStore.hasCatalog() && dispCatalogStore.classifyList.length) {
-      const catalogIds = new Set();
-      for (const cls of dispCatalogStore.classifyList) {
-        const rows = (cls.dispItemList || []).slice().sort((a, b) => a.id - b.id);
-        if (!rows.length) continue;
-        const optgroup = document.createElement("optgroup");
-        const classifyLabel = dispCatalogStore.getClassifyLabel(cls);
-        optgroup.label = classifyLabel ? `${classifyLabel} (${rows.length})` : `(${rows.length})`;
-        for (const row of rows) {
-          catalogIds.add(row.id);
-          appendDispOption(optgroup, row.id);
-        }
-        select.appendChild(optgroup);
-      }
-
-      const extras = Object.entries(DISP_NAME_MAP)
-        .map(([id]) => toNum(id, NaN))
-        .filter((id) => Number.isFinite(id) && !catalogIds.has(id))
-        .sort((a, b) => a - b);
-      if (extras.length) {
-        const optgroup = document.createElement("optgroup");
-        optgroup.label = `${t("disp.cat.other")} (${extras.length})`;
-        for (const id of extras) appendDispOption(optgroup, id);
-        select.appendChild(optgroup);
-      }
-    } else {
-      const dispEntries = Object.entries(DISP_NAME_MAP)
-        .map(([id, name]) => ({ id: toNum(id, NaN), name: String(name || "") }))
-        .filter((x) => Number.isFinite(x.id))
-        .sort((a, b) => a.id - b.id);
-
-      const groups = new Map();
-      for (const row of dispEntries) {
-        const category = dispCategoryKey(row.id, row.name);
-        if (!groups.has(category)) groups.set(category, []);
-        groups.get(category).push(row);
-        if (row.id === currentId) hasCurrent = true;
-      }
-      const orderedCats = DISP_CATEGORY_ORDER.filter((c) => groups.has(c));
-      const extraCats = [...groups.keys()].filter((c) => !DISP_CATEGORY_ORDER.includes(c)).sort();
-      for (const cat of [...orderedCats, ...extraCats]) {
-        const optgroup = document.createElement("optgroup");
-        const rows = groups.get(cat) || [];
-        optgroup.label = `${t(cat)} (${rows.length})`;
-        for (const row of rows) appendDispOption(optgroup, row.id);
-        select.appendChild(optgroup);
-      }
+      if (dispId === selectedId) opt.selected = true;
+      select.appendChild(opt);
     }
+    if (hasSelected) select.value = String(selectedId);
+  }
 
-    if (!hasCurrent) {
-      const optgroup = document.createElement("optgroup");
-      optgroup.label = t("disp.cat.currentValue");
+  function buildDispSelectForEditor(currentDisp) {
+    const currentId = toNum(currentDisp, 0);
+    const groups = collectDispPickerGroups();
+    let activeGroup = findDispPickerGroup(groups, currentId);
+    if (!activeGroup && Number.isFinite(currentId)) {
+      const orphanGroup = {
+        groupKey: "__current__",
+        label: t("disp.cat.currentValue"),
+        dispIds: [currentId]
+      };
+      groups.push(orphanGroup);
+      activeGroup = orphanGroup;
+    }
+    if (!activeGroup && groups.length) activeGroup = groups[0];
+
+    const row = document.createElement("div");
+    row.className = "disp-picker-row";
+
+    const categorySelect = document.createElement("select");
+    categorySelect.className = "disp-picker-category";
+    categorySelect.title = t("editor.dispPickCategory");
+    for (const group of groups) {
       const opt = document.createElement("option");
-      opt.value = String(currentId);
-      opt.textContent = `${formatDispOptionText(currentId)} (${t("disp.cat.currentValue")})`;
-      optgroup.appendChild(opt);
-      select.appendChild(optgroup);
+      opt.value = group.groupKey;
+      opt.textContent = group.label;
+      if (activeGroup && group.groupKey === activeGroup.groupKey) opt.selected = true;
+      categorySelect.appendChild(opt);
     }
-    select.value = String(currentId);
-    return select;
+
+    const itemSelect = document.createElement("select");
+    itemSelect.className = "disp-picker-item";
+    itemSelect.dataset.key = "disp";
+    itemSelect.title = t("editor.dispPickItem");
+    fillDispItemSelect(itemSelect, activeGroup?.dispIds || [], currentId);
+
+    categorySelect.addEventListener("change", () => {
+      const group = groups.find((entry) => entry.groupKey === categorySelect.value);
+      fillDispItemSelect(itemSelect, group?.dispIds || [], currentId);
+    });
+
+    row.append(categorySelect, itemSelect);
+    return { node: row, input: itemSelect };
   }
 
   function buildAlignSelectForEditor(currentAlign) {
@@ -8265,8 +8305,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       let input;
       let controlNode;
       if (field.key === "disp") {
-        input = buildDispSelectForEditor(item.disp);
-        controlNode = input;
+        const dispPicker = buildDispSelectForEditor(item.disp);
+        input = dispPicker.input;
+        controlNode = dispPicker.node;
       } else if (field.key === "alig") {
         input = buildAlignSelectForEditor(item.alig);
         controlNode = input;
@@ -8319,7 +8360,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
           if (val) state.previewTextOverrides.set(state.selectedIndex, val);
           else state.previewTextOverrides.delete(state.selectedIndex);
         } else if (field.key === "disp") {
-          current[field.key] = toNum(input.value, toNum(current[field.key], 0));
+          const nextDisp = toNum(input.value, NaN);
+          if (!Number.isFinite(nextDisp)) return;
+          current[field.key] = nextDisp;
         } else if (field.key === "hier") {
           current[field.key] = toNum(input.value, 0);
         } else if (field.key === "font") {
@@ -9201,8 +9244,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     try {
       const remote = await fetchDispItemList(divoomStoreJson);
       const local = await loadDispInfoJsonForSync();
-      const merged = dispCatalogStore.mergeRemote(remote, local);
-      const cfgShape = dispCatalogToCfgShape(merged);
+      const stats = summarizeDispCatalogSync(local, remote);
+      const cfgShape = dispCatalogStore.applyRemoteCatalog(remote);
       const apiOk = await isDevSyncApiAvailable();
       if (apiOk) {
         try {
@@ -9211,8 +9254,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
           fontStore.log(t("disp.sync.writeFailed", { message: errorToText(e) }));
         }
       }
-      fontStore.log(t("disp.sync.done", { count: merged.DispList.length }));
-      showLanCenteredMessage(t("disp.sync.done", { count: merged.DispList.length }));
+      const syncMsg =
+        stats.added + stats.updated > 0
+          ? t("disp.sync.changed", {
+              added: stats.added,
+              updated: stats.updated,
+              total: stats.total
+            })
+          : t("disp.sync.upToDate", { total: stats.total });
+      fontStore.log(syncMsg);
+      showLanCenteredMessage(syncMsg);
     } catch (e) {
       const msg = errorToText(e);
       fontStore.log(t("disp.sync.failed", { message: msg }));

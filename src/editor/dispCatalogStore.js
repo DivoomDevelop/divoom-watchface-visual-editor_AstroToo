@@ -1,4 +1,4 @@
-import { mergeDispCatalog, normalizeDispCatalogPayload } from "./dispCloudSync.js";
+import { mergeDispCatalog, normalizeDispCatalogPayload, remoteDispCatalogToCfg } from "./dispCloudSync.js";
 
 export class DispCatalogStore {
   /** @param {() => string} getLocaleCode */
@@ -26,6 +26,13 @@ export class DispCatalogStore {
     const merged = mergeDispCatalog(local, remote);
     this.loadFromCfg(merged);
     return merged;
+  }
+
+  /** 用远程 GetDispItemList 结果完全替换本地目录（不合并、不过滤条目）。 */
+  applyRemoteCatalog(remote) {
+    const cfgShape = remoteDispCatalogToCfg(remote);
+    this.loadFromCfg(cfgShape);
+    return cfgShape;
   }
 
   getMeta(dispId) {

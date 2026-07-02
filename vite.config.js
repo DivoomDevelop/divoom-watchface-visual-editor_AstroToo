@@ -100,6 +100,17 @@ function createTemplateSyncApiMiddleware() {
         return;
       }
 
+      if (url === "/api/template-sync/delete") {
+        const { norm, absPath } = assertDevSyncRelPath(body?.relPath);
+        let deleted = false;
+        if (fs.existsSync(absPath)) {
+          fs.unlinkSync(absPath);
+          deleted = true;
+        }
+        sendJson(res, 200, { ok: true, relPath: norm, deleted });
+        return;
+      }
+
       if (url === "/api/template-sync/classify") {
         const data = body?.data;
         if (!data || typeof data !== "object") throw new Error("missing data");

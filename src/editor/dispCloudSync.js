@@ -22,7 +22,12 @@ export function normalizeDispItemEntry(raw) {
  */
 export function normalizeClassifyEntry(raw) {
   const id = Number(raw?.ID ?? raw?.id ?? raw?.ClassifyId ?? 0);
-  const dispItemList = (Array.isArray(raw?.DispItemList) ? raw.DispItemList : [])
+  const sourceList = Array.isArray(raw?.DispItemList)
+    ? raw.DispItemList
+    : Array.isArray(raw?.dispItemList)
+      ? raw.dispItemList
+      : [];
+  const dispItemList = sourceList
     .map((row) => normalizeDispItemEntry(row))
     .filter(Boolean);
   return {
@@ -37,9 +42,9 @@ export function normalizeClassifyEntry(raw) {
  * @param {Record<string, unknown>} data
  */
 export function normalizeDispCatalogPayload(data) {
-  const classifyList = (Array.isArray(data?.ClassifyList) ? data.ClassifyList : [])
-    .map((row) => normalizeClassifyEntry(row))
-    .filter((row) => row.dispItemList.length > 0 || row.name || row.nameEn);
+  const classifyList = (Array.isArray(data?.ClassifyList) ? data.ClassifyList : []).map((row) =>
+    normalizeClassifyEntry(row)
+  );
   const byId = new Map();
   for (const cls of classifyList) {
     for (const item of cls.dispItemList) {
@@ -58,9 +63,20 @@ export function normalizeDispCatalogPayload(data) {
   };
 }
 
+/** GetDispItemList 请求体：AllFlag=1 返回全部分类与条目（含未开放）。 */
+export const GET_DISP_ITEM_LIST_PAYLOAD = { ClassifyList: [], AllFlag: 1 };
+
 export async function fetchDispItemList(storeJson) {
-  const data = await storeJson("Device/GetDispItemList", { ClassifyList: [] });
+  const data = await storeJson("Device/GetDispItemList", GET_DISP_ITEM_LIST_PAYLOAD);
   return normalizeDispCatalogPayload(data);
+}
+
+/** 远程 API 目录原样写入 cfg / 运行时（不做 OpenStatus 或分类过滤）。 */
+export function remoteDispCatalogToCfg(remote) {
+  return dispCatalogToCfgShape({
+    syncedAt: remote.syncedAt,
+    ClassifyList: remote.ClassifyList
+  });
 }
 
 /**
@@ -110,6 +126,43 @@ export function mergeDispCatalog(localInfo, remote) {
       }))
     }))
   });
+}
+
+/**
+ * 对比本地与远程目录，统计本次同步实际变更量（非合并后的总数）。
+ * @param {Record<string, unknown>|null} localInfo
+ * @param {ReturnType<typeof normalizeDispCatalogPayload>} remote
+ */
+export function summarizeDispCatalogSync(localInfo, remote) {
+  const localNorm = localInfo ? normalizeDispCatalogPayload(localInfo) : { DispList: [] };
+  const localById = new Map(localNorm.DispList.map((row) => [row.id, row]));
+  let added = 0;
+  let updated = 0;
+  let unchanged = 0;
+  for (const row of remote.DispList) {
+    const prev = localById.get(row.id);
+    if (!prev) {
+      added += 1;
+      continue;
+    }
+    const changed =
+      prev.name !== row.name ||
+      prev.nameEn !== row.nameEn ||
+      prev.desc !== row.desc ||
+      prev.openStatus !== row.openStatus ||
+      prev.classifyId !== row.classifyId ||
+      prev.classifyName !== row.classifyName ||
+      prev.classifyNameEn !== row.classifyNameEn;
+    if (changed) updated += 1;
+    else unchanged += 1;
+  }
+  return {
+    total: remote.DispList.length,
+    added,
+    updated,
+    unchanged,
+    localTotal: localNorm.DispList.length
+  };
 }
 
 export function dispCatalogToCfgShape(catalog) {

@@ -1,5 +1,5 @@
 import { downloadAssetBytes } from "./cdnAssets.js";
-import { writeDevFileViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
+import { deleteDevFileViaApi, writeDevFileViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
 import {
   localFontFileRelPath,
   mergeFontInfoEntries,
@@ -89,11 +89,18 @@ export async function downloadSelectedFontsToLocal({
   };
 
   const selected = (Array.isArray(items) ? items : [])
-    .map((row) => normalizeFontListEntry(row))
+    .map((row) => {
+      const norm = normalizeFontListEntry(row);
+      if (!norm) return null;
+      return {
+        ...norm,
+        reason: String(row?.reason || "").trim()
+      };
+    })
     .filter((row) => row && row.url);
 
   if (!selected.length) {
-    return { requested: 0, metaMerged: 0, filesWritten: 0, filesFailed: 0 };
+    return { requested: 0, metaMerged: 0, filesWritten: 0, filesFailed: 0, filesDeleted: 0 };
   }
 
   let currentInfo = null;
@@ -102,17 +109,29 @@ export async function downloadSelectedFontsToLocal({
   } catch {
     currentInfo = { FontList: [] };
   }
+  const localById = new Map();
+  for (const raw of Array.isArray(currentInfo?.FontList) ? currentInfo.FontList : []) {
+    const norm = normalizeFontListEntry(raw);
+    if (norm) localById.set(norm.id, norm);
+  }
+
   const merged = mergeFontInfoEntries(currentInfo, selected);
   await writeFontInfoViaApi(merged);
   const metaMerged = selected.length;
 
   let filesWritten = 0;
   let filesFailed = 0;
+  let filesDeleted = 0;
   const total = selected.length;
 
   for (let i = 0; i < selected.length; i++) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const entry = selected[i];
+    const local = localById.get(entry.id);
+    const urlChanged =
+      entry.reason === "outdated" ||
+      (local?.url && entry.url && local.url !== entry.url);
+
     report({
       phase: "font",
       index: i + 1,
@@ -120,6 +139,14 @@ export async function downloadSelectedFontsToLocal({
       message: `font ${entry.id} (${i + 1}/${total})`
     });
     try {
+      if (urlChanged) {
+        try {
+          await deleteDevFileViaApi(localFontFileRelPath(entry.id));
+          filesDeleted += 1;
+        } catch {
+          /* 文件可能已不存在，继续下载 */
+        }
+      }
       const bytes = await downloadAssetBytes(entry.url, {
         useCdnProxy: true,
         origin,
@@ -132,5 +159,5 @@ export async function downloadSelectedFontsToLocal({
     }
   }
 
-  return { requested: total, metaMerged, filesWritten, filesFailed };
+  return { requested: total, metaMerged, filesWritten, filesFailed, filesDeleted };
 }

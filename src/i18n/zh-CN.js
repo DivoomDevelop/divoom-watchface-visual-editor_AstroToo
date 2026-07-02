@@ -94,6 +94,8 @@ const zhCN = Object.freeze({
   "editor.itemId": "元素标识（item_id）",
   "editor.info": "描述（info）",
   "editor.disp": "显示元素类型（disp）",
+  "editor.dispPickCategory": "显示元素分类",
+  "editor.dispPickItem": "请选择显示元素",
   "editor.font": "字体选择（font）",
   "editor.previewText": "模拟显示数据（不导出）",
   "editor.size": "字体大小（size）",
@@ -221,8 +223,10 @@ const zhCN = Object.freeze({
   "font.pending.noneSelected": "请至少勾选一个字体。",
 
   "disp.btn.sync": "更新显示元素",
-  "disp.btn.syncTitle": "从 Divoom 中国区服务器同步显示元素列表（Device/GetDispItemList）；写入需 npm run dev",
+  "disp.btn.syncTitle": "从 Divoom 中国区服务器同步显示元素名称（Device/GetDispItemList）；写入需 npm run dev",
   "disp.sync.done": "已更新 {count} 个显示元素名称。",
+  "disp.sync.upToDate": "显示元素名称已是最新（云端 {total} 项，本次无新增或变更）。",
+  "disp.sync.changed": "同步完成：新增 {added} 项，更新 {updated} 项名称（云端共 {total} 项）。",
   "disp.sync.failed": "更新显示元素失败：{message}",
   "disp.sync.writeFailed": "disp_info.cfg 写入失败：{message}",
 
