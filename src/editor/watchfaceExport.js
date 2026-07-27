@@ -4,7 +4,6 @@ export const CLOCK_JSON_FILENAME = "clock.json";
 const BG_PREFIX = "BG";
 const APP_PREVIEW_PREFIX = "APP";
 const ITEM_PREFIX = "ITEM";
-const SUB_CLOCK_ID_PREFIX = "SubClockId_";
 
 const KNOWN_IMAGE_EXTS = /\.(png|jpe?g|webp|gif|bmp)$/i;
 
@@ -225,15 +224,14 @@ function remapClockObjAssetRefs(clockObj, nameMap) {
   }
 }
 
-/** 导出时保证 ItemList[].item_id 与 ItemIdList 唯一：SubClockId_1、SubClockId_2… */
-export function assignUniqueExportItemIds(clockObj) {
+/** 导出时保持默认 item_id 为空，与编辑面板默认值一致。 */
+export function clearExportItemIds(clockObj) {
   const itemList = Array.isArray(clockObj?.ItemList) ? clockObj.ItemList : [];
   const ids = [];
   for (let i = 0; i < itemList.length; i += 1) {
-    const id = `${SUB_CLOCK_ID_PREFIX}${i + 1}`;
     const item = itemList[i];
-    if (item && typeof item === "object") item.item_id = id;
-    ids.push(id);
+    if (item && typeof item === "object") item.item_id = "";
+    ids.push("");
   }
   clockObj.ItemIdList = ids;
   return clockObj;
@@ -365,7 +363,7 @@ export function planFlatWatchfaceExport(rec, deps) {
     }
   }
 
-  assignUniqueExportItemIds(clockObj);
+  clearExportItemIds(clockObj);
 
   return { clockObj, assets, usedNames };
 }

@@ -3310,6 +3310,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     "hier",
     "alig"
   ]);
+  const LAN_ITEM_ID_FALLBACK_PREFIX = "DispItem_";
+  const LEGACY_ITEM_ID_PLACEHOLDER = "SubClockId_";
 
   function setNodeText(node, value) {
     if (!node) return;
@@ -3613,13 +3615,19 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       ...DEFAULT_ITEM,
       font: fontId,
       hier: 0,
-      item_id: `item_${index + 1}`
+      item_id: ""
     };
+  }
+
+  function normalizeEditorItemId(value) {
+    const s = value === undefined || value === null ? "" : String(value);
+    if (s === LEGACY_ITEM_ID_PLACEHOLDER || /^DispItem_\d+$/i.test(s) || /^item_\d+$/i.test(s)) return "";
+    return s;
   }
 
   function normalizeItem(raw, index) {
     const item = { ...createDefaultItem(index), ...(raw || {}) };
-    if (item.item_id === undefined || item.item_id === null) item.item_id = `item_${index + 1}`;
+    item.item_id = normalizeEditorItemId(item.item_id);
     item.color_1 = ensureColorHex(item.color_1, "#ffffff");
     item.color_2 = ensureColorHex(item.color_2, "#000000");
     item.disp = toNum(item.disp ?? item.type, item.disp ?? 4);
@@ -3649,9 +3657,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    * `ItemList[i]: missing or empty string "item_id"`。模板里常见空串需在下发前补默认值。
    */
   function itemIdListEntryForLan(it, idx) {
-    const raw = it?.item_id;
-    const s = raw === undefined || raw === null ? "" : String(raw);
-    return s.length > 0 ? s : `item_${idx + 1}`;
+    const s = normalizeEditorItemId(it?.item_id);
+    return s.length > 0 ? s : `${LAN_ITEM_ID_FALLBACK_PREFIX}${idx + 1}`;
+  }
+
+  function itemListWithLanItemIds(items) {
+    return (Array.isArray(items) ? items : []).map((item, idx) => ({
+      ...item,
+      item_id: itemIdListEntryForLan(item, idx)
+    }));
   }
 
   function normalizeConfig(raw) {
@@ -3697,19 +3711,11 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   /**
-   * 同时回写 ItemList[].item_id：固件不仅校验顶层 ItemIdList 数组，还会按位置读取每个 ItemList
-   * 条目自身的 `item_id` 字段，两者均必须非空。
+   * 同步 ItemIdList；编辑框中的 ItemList[].item_id 保持用户值，LAN 下发时再对发送副本补非空值。
    */
   function syncItemIdList() {
     const ids = state.config.ItemList.map((it, idx) => itemIdListEntryForLan(it, idx));
     state.config.ItemIdList = ids;
-    state.config.ItemList.forEach((it, idx) => {
-      if (!it) return;
-      const want = ids[idx];
-      const cur = it.item_id;
-      const curStr = cur === undefined || cur === null ? "" : String(cur);
-      if (curStr.length === 0) it.item_id = want;
-    });
   }
 
   /** UI 为简体中文时读取中文名；其余语言（含繁体、英语等）模板/表盘名称统一以英文为主。 */
@@ -6314,7 +6320,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const mergedItemList = mergeItemListImageAddrForLanPatch(state.config.ItemList, deviceItems);
     return {
       ...clockSel,
-      ItemList: mergedItemList.map((item) => ({ ...item })),
+      ItemList: itemListWithLanItemIds(mergedItemList),
       ItemIdList: [...state.config.ItemIdList]
     };
   }
@@ -6407,7 +6413,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       NameCn: name,
       NameEn: name,
       ClockId: 0,
-      ItemList: state.config.ItemList.map((item) => ({ ...item })),
+      ItemList: itemListWithLanItemIds(state.config.ItemList),
       ItemIdList: [...state.config.ItemIdList]
     };
   }
@@ -7219,7 +7225,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         const fullReplaceLeafMap = collectLanBundlableDispAssetLeaves();
         const dialPack = await resolveLanMultipartDialSecondPart();
         assertNonEmptyDialImageBlob(dialPack.blob);
-        const sanitizedFull = sanitizeItemListImageAddrForLanUpload(merged, dialPack.leafSet);
+        const lanFullItems = itemListWithLanItemIds(merged);
+        const sanitizedFull = sanitizeItemListImageAddrForLanUpload(lanFullItems, dialPack.leafSet);
         if (sanitizedFull.stripped.length) {
           fontStore.log(
             t("lan.log.createImageAddrStripped", {
@@ -8270,6 +8277,11 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       tip.textContent = t("editor.tipSelectItem");
       dom.itemEditor.appendChild(tip);
       return;
+    }
+    const normalizedItemId = normalizeEditorItemId(item.item_id);
+    if (item.item_id !== normalizedItemId) {
+      item.item_id = normalizedItemId;
+      syncItemIdList();
     }
     const currentDisp = toNum(item.disp, 0);
     const isImageLikeDisp = IMAGE_DISP_IDS.has(currentDisp) || POINTER_DISP_IDS.has(currentDisp) || isLocalAssetDisp(currentDisp);
@@ -9396,7 +9408,11 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (state.selectedIndex < 0) return;
     const src = state.config.ItemList[state.selectedIndex];
     if (!src) return;
-    const clone = normalizeItem({ ...src, item_id: `${src.item_id || "item"}_copy` }, state.config.ItemList.length);
+    const srcItemId = String(src.item_id || "").trim();
+    const clone = normalizeItem(
+      { ...src, item_id: srcItemId ? `${srcItemId}_copy` : "" },
+      state.config.ItemList.length
+    );
     clone.y += 20;
     state.config.ItemList.push(clone);
     syncItemIdList();
