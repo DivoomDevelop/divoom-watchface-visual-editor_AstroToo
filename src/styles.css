@@ -740,8 +740,30 @@ button:disabled {
   min-width: 0;
 }
 
+.sep-control-editor {
+  display: grid;
+  grid-template-columns: minmax(64px, 0.38fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.sep-control-editor input[type="number"] {
+  width: 100%;
+}
+
+.sep-control-slider {
+  width: 100%;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 @media (max-width: 720px) {
   .disp-picker-row {
+    grid-template-columns: 1fr;
+  }
+
+  .sep-control-editor {
     grid-template-columns: 1fr;
   }
 }

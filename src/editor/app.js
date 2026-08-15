@@ -8091,6 +8091,41 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return select;
   }
 
+  function buildSepControlForEditor(currentSep) {
+    const value = normalizeCharSpacing(currentSep, 0);
+    const box = document.createElement("div");
+    box.className = "sep-control-editor";
+
+    const numberInput = document.createElement("input");
+    numberInput.type = "number";
+    numberInput.dataset.key = "sep";
+    numberInput.min = "-20";
+    numberInput.max = "200";
+    numberInput.step = "1";
+    numberInput.value = String(value);
+
+    const rangeInput = document.createElement("input");
+    rangeInput.type = "range";
+    rangeInput.className = "sep-control-slider";
+    rangeInput.min = "-20";
+    rangeInput.max = "200";
+    rangeInput.step = "1";
+    rangeInput.value = String(value);
+    rangeInput.setAttribute("aria-label", t("editor.sep"));
+
+    rangeInput.addEventListener("input", () => {
+      numberInput.value = rangeInput.value;
+      numberInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    numberInput.addEventListener("input", () => {
+      const next = normalizeCharSpacing(numberInput.value, 0);
+      rangeInput.value = String(next);
+    });
+
+    box.append(numberInput, rangeInput);
+    return { node: box, input: numberInput };
+  }
+
   function buildColorPaletteInputForEditor(currentColor) {
     const normalized = ensureColorHex(currentColor, "#ffffff");
     const box = document.createElement("div");
@@ -8323,6 +8358,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       } else if (field.key === "alig") {
         input = buildAlignSelectForEditor(item.alig);
         controlNode = input;
+      } else if (field.key === "sep") {
+        const sepControl = buildSepControlForEditor(item.sep);
+        input = sepControl.input;
+        controlNode = sepControl.node;
       } else if (field.key === "hier") {
         input = document.createElement("select");
         input.dataset.key = "hier";
