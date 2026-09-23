@@ -1,8 +1,15 @@
-import { downloadAssetBytes, extFromAssetPath } from "./cdnAssets.js";
+import { downloadAssetBytes, extFromAssetPath, extFromImageBytes } from "./cdnAssets.js";
 import { saveClassifyCacheViaApi, writeDevFileViaApi } from "./devSyncApi.js";
 import { collectFontIdsFromClockInfo, syncMissingFontsFromDevice } from "./fontSync.js";
 
-export { DIVOOM_CDN_BASE, downloadAssetBytes, extFromAssetPath, resolveCdnFetchUrl, resolveCdnUrl } from "./cdnAssets.js";
+export {
+  DIVOOM_CDN_BASE,
+  downloadAssetBytes,
+  extFromAssetPath,
+  extFromImageBytes,
+  resolveCdnFetchUrl,
+  resolveCdnUrl
+} from "./cdnAssets.js";
 
 export const TEMPLATE_SYNC_PAGE_SIZE = 100;
 
@@ -185,7 +192,9 @@ export function enrichClassifyCatalogNames(catalog, nameIndex) {
     const names = Number.isFinite(id) ? nameIndex.get(id) : null;
     if (!names) return row;
     const cn = String(row?.ClassifyName || "").trim() || names.ClassifyName;
-    const en = String(row?.ClassifyNameEn || "").trim() || names.ClassifyNameEn || cn;
+    const storedEn = String(row?.ClassifyNameEn || "").trim();
+    const en = (storedEn && !/[\u3400-\u9fff]/.test(storedEn)
+      ? storedEn : String(names.ClassifyNameEn || "").trim()) || storedEn || cn;
     return { ...row, ClassifyName: cn, ClassifyNameEn: en };
   });
   return { ...catalog, ClassifyList };
@@ -196,7 +205,9 @@ export function classifyCatalogNeedsNameEnrichment(catalog) {
   return list.some((row) => {
     const id = Number(row?.ClassifyId);
     if (!Number.isFinite(id) || id <= 0) return false;
-    return !String(row?.ClassifyName || "").trim() && !String(row?.ClassifyNameEn || "").trim();
+    const cn = String(row?.ClassifyName || "").trim();
+    const en = String(row?.ClassifyNameEn || "").trim();
+    return !cn || !en || /[\u3400-\u9fff]/.test(en);
   });
 }
 
@@ -327,6 +338,12 @@ export function planTemplateAssetWrites(clockId, clockInfo, { getSlotByItem, isI
   return writes;
 }
 
+function relPathWithDetectedImageExt(relPath, bytes) {
+  const ext = extFromImageBytes(bytes);
+  if (!ext) return relPath;
+  return String(relPath || "").replace(/\.[^/.]+$/, ext);
+}
+
 /**
  * 从已连接设备拉取商店分类与表盘详情，写入 public/template（需 Vite dev API）。
  */
@@ -438,7 +455,7 @@ export async function syncTemplatesFromDevice({
             origin,
             signal
           });
-          await writeTemplateFileViaApi(aw.relPath, bytes);
+          await writeTemplateFileViaApi(relPathWithDetectedImageExt(aw.relPath, bytes), bytes);
           assetsWritten += 1;
         } catch {
           assetsFailed += 1;
@@ -550,6 +567,8 @@ export async function scanPendingTemplatesFromDevice({
           items.push({
             clockId: c.clockId,
             clockName: c.clockName,
+            clockNameCn: language.startsWith("zh") ? c.clockName : "",
+            clockNameEn: language === "en" ? c.clockName : "",
             imagePixelId: c.imagePixelId,
             classifyId,
             reason,
@@ -700,7 +719,7 @@ export async function downloadSingleTemplateToLocal({
     report({ percent: pct, message: aw.relPath });
     try {
       const bytes = await downloadAssetBytes(aw.fileAddr, { useCdnProxy: true, origin });
-      await writeTemplateFileViaApi(aw.relPath, bytes);
+      await writeTemplateFileViaApi(relPathWithDetectedImageExt(aw.relPath, bytes), bytes);
     } catch (e) {
       assetsFailed += 1;
       failedPaths.push(`${aw.relPath}: ${e?.message || e}`);

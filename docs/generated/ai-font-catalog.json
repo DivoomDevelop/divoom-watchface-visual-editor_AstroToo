@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-13T09:32:46.079Z",
+  "generatedAt": "2026-09-23T09:14:38.262Z",
   "sourceFile": "public/font/font_info.cfg",
   "summary": {
-    "count": 12,
-    "vectorTtfCount": 5,
-    "imageGlyphCount": 7
+    "count": 78,
+    "vectorTtfCount": 45,
+    "imageGlyphCount": 33
   },
   "rulesForModels": [
     "Every ItemList entry uses numeric font field; MUST be one of allowedFontIds (or firmware may fall back / fail).",
@@ -14,7 +14,6 @@
     "charset on image fonts lists drawable characters; empty charset often means full atlas handled by device."
   ],
   "allowedFontIds": [
-    2,
     6,
     8,
     10,
@@ -25,18 +24,76 @@
     20,
     22,
     24,
-    28
+    28,
+    34,
+    36,
+    38,
+    40,
+    42,
+    44,
+    46,
+    48,
+    50,
+    52,
+    54,
+    56,
+    58,
+    60,
+    62,
+    64,
+    66,
+    68,
+    70,
+    72,
+    74,
+    76,
+    78,
+    84,
+    86,
+    88,
+    90,
+    92,
+    96,
+    98,
+    100,
+    106,
+    108,
+    112,
+    114,
+    116,
+    122,
+    126,
+    128,
+    130,
+    132,
+    134,
+    136,
+    138,
+    140,
+    142,
+    148,
+    150,
+    152,
+    154,
+    156,
+    158,
+    160,
+    162,
+    164,
+    166,
+    168,
+    170,
+    172,
+    174,
+    176,
+    178,
+    180,
+    182,
+    184,
+    188,
+    190
   ],
   "fonts": [
-    {
-      "id": 2,
-      "type": 1,
-      "typeLabel": "vector_ttf",
-      "name": "OPPO Sans-Blod",
-      "url": "group1/M00/13/3E/rBAAM2lCSB6EbhI1AAAAAMlEn4Q308.ttf",
-      "charsetLength": 0,
-      "charsetPreview": ""
-    },
     {
       "id": 6,
       "type": 1,
@@ -60,7 +117,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "22*39数字(时间日期)白色方块字体",
-      "url": "group1/M00/13/92/rBAAM2lKYOWEG-I-AAAAAGe1Lrw93.webp",
+      "url": "group1/M00/11/9A/Ci0s8Wovs-KEMPGbAAAAABuAOWA699.bin",
       "charsetLength": 10,
       "charsetPreview": "0123456789"
     },
@@ -69,7 +126,7 @@
       "type": 1,
       "typeLabel": "vector_ttf",
       "name": "Bebas Neue",
-      "url": "group1/M00/0B/E1/Ci0s8WlLn4yEaIJ8AAAAAAPGbuY077.otf",
+      "url": "group1/M00/12/CD/Ci0s8WpnK1OEFxj1AAAAAJ-V9bY279.ttf",
       "charsetLength": 0,
       "charsetPreview": ""
     },
@@ -78,7 +135,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "26*48数字（比分）白色方块字体",
-      "url": "group1/M00/0D/23/Ci0s8WlopBGEPKP-AAAAAHdAdM882.webp",
+      "url": "group1/M00/19/48/rBAAM2ovs22EeSHvAAAAAFCj4ZQ295.bin",
       "charsetLength": 10,
       "charsetPreview": "0123456789"
     },
@@ -87,7 +144,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "56*112数字/字符",
-      "url": "group1/M00/15/14/rBAAM2lwePKEaQSSAAAAAE-bZFQ40.webp",
+      "url": "group1/M00/11/9A/Ci0s8WovsIKEHHlWAAAAACfHTe8133.bin",
       "charsetLength": 14,
       "charsetPreview": "0123456789km.$"
     },
@@ -96,7 +153,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "54*76数字-neno",
-      "url": "group1/M00/15/2B/rBAAM2l0PoyESZ5-AAAAABkVTK820.webp",
+      "url": "group1/M00/19/48/rBAAM2ovsseEXNjxAAAAAEQX9IM309.bin",
       "charsetLength": 11,
       "charsetPreview": "0123456789."
     },
@@ -105,7 +162,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "40*68大写字母字体-白色（26个）",
-      "url": "group1/M00/15/2C/rBAAM2l0YAOEK5rcAAAAAOemuSs40.webp",
+      "url": "group1/M00/11/9A/Ci0s8WovsfyEDofnAAAAAL4XduQ788.bin",
       "charsetLength": 26,
       "charsetPreview": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     },
@@ -114,7 +171,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "44*76数字-黄色",
-      "url": "group1/M00/0D/75/Ci0s8Wl0YIOEf9TKAAAAAPUHfBM24.webp",
+      "url": "group1/M00/19/48/rBAAM2ovsI-ESbNeAAAAACVNnrk291.bin",
       "charsetLength": 11,
       "charsetPreview": "0123456789."
     },
@@ -123,7 +180,7 @@
       "type": 0,
       "typeLabel": "image_glyph",
       "name": "56*112数字-白色",
-      "url": "group1/M00/15/2D/rBAAM2l0gniESsHTAAAAAE-bZFQ86.webp",
+      "url": "group1/M00/19/48/rBAAM2ovsHqEUtQ6AAAAACfHTe8067.bin",
       "charsetLength": 14,
       "charsetPreview": "0123456789KM.$"
     },
@@ -132,9 +189,612 @@
       "type": 1,
       "typeLabel": "vector_ttf",
       "name": "OPPOSans Medium",
-      "url": "group1/M00/19/36/rBAAM2os0XeEPpH-AAAAAJOW9TA175.ttf",
+      "url": "group1/M00/13/D3/Ci0s8WqRTlGEeokIAAAAAJng46I748.ttf",
       "charsetLength": 0,
       "charsetPreview": ""
+    },
+    {
+      "id": 34,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Digital-7",
+      "url": "group1/M00/11/9A/Ci0s8WovlU6EASNNAAAAAAUdkdk995.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 36,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "OPPOSansBold (裁剪过)",
+      "url": "group1/M00/19/C0/rBAAM2pGPUqEctmiAAAAAOpzn2I895.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 38,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "站酷庆科黄油体",
+      "url": "group1/M00/12/48/Ci0s8WpQkMaEfpI8AAAAAC02H9I601.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 40,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Tomorrow-Bold",
+      "url": "group1/M00/19/F5/rBAAM2pQm6KERlX-AAAAAJsc-ig754.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 42,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Tomorrow-Medium",
+      "url": "group1/M00/12/49/Ci0s8WpQm7eELmyCAAAAAMjEuaE982.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 44,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "BigShoulders-Bold",
+      "url": "group1/M00/12/70/Ci0s8WpXReiEWwc_AAAAABIjyoQ268.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 46,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "方正像素裁切",
+      "url": "group1/M00/1A/1C/rBAAM2pXViWEAJF2AAAAABsQbQg596.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 48,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "荆南麦圆体裁切",
+      "url": "group1/M00/1B/80/rBAAM2qRSUGEV0wYAAAAAK0c6x4466.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 50,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "DancingScript-Regular",
+      "url": "group1/M00/12/70/Ci0s8WpXW0qEQJq8AAAAAPZdSxU448.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 52,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Jersey10-Regular",
+      "url": "group1/M00/12/7D/Ci0s8WpZowmEOefzAAAAAEmCsyE250.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 54,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Public Pixel",
+      "url": "group1/M00/12/80/Ci0s8WpZ6U6EbYYcAAAAAORwu_Q043.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 56,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "132*174数字（简约红）",
+      "url": "group1/M00/1A/2D/rBAAM2paAgqEC0gfAAAAAGU02go192.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 58,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "34*64数字（简约黑）",
+      "url": "group1/M00/1A/2D/rBAAM2paAj6EXcbcAAAAAC2Xeu4057.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 60,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "时间纪念碑大字体（80*113）",
+      "url": "group1/M00/12/87/Ci0s8WpbKnmEIdlbAAAAAHaJ25U963.bin",
+      "charsetLength": 12,
+      "charsetPreview": "0123456789,."
+    },
+    {
+      "id": 62,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "时间纪念碑小字体（20*29）",
+      "url": "group1/M00/1A/33/rBAAM2pbKrGEGdyeAAAAADnWI-U372.bin",
+      "charsetLength": 12,
+      "charsetPreview": "0123456789,."
+    },
+    {
+      "id": 64,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "D-DIN-Regular",
+      "url": "group1/M00/12/A6/Ci0s8WpgkW-EP4hCAAAAALUsmkM242.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 66,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "D-DIN-Bold",
+      "url": "group1/M00/1A/52/rBAAM2pgkXyEdL4NAAAAALTiAU0089.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 68,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "LibreBaskerville-Regular",
+      "url": "group1/M00/12/AC/Ci0s8WphfgGEaA08AAAAAIkLBeQ432.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 70,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Trueno-bold",
+      "url": "group1/M00/12/CD/Ci0s8WpnLOCEaMCIAAAAAJxGgcA083.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 72,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Big Shoulders-Regular",
+      "url": "group1/M00/1A/62/rBAAM2pjFkKEFU6XAAAAAKxPBBU417.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 74,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "庞门正道粗书体裁切",
+      "url": "group1/M00/12/CB/Ci0s8Wpmt1-EVaSiAAAAACrG9oY164.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 76,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "BigShoulders-Medium",
+      "url": "group1/M00/12/CD/Ci0s8WpnIjqETPyjAAAAAIvLsYA695.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 78,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Tomorrow-Regular",
+      "url": "group1/M00/1A/86/rBAAM2ppcveEXA4KAAAAAEuyYNI166.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 84,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "CaveatBrush-Regular",
+      "url": "group1/M00/12/E1/Ci0s8Wpqqk2EWJWKAAAAANCWwXM209.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 86,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "AveriaSansLibre-Regular",
+      "url": "group1/M00/1A/8D/rBAAM2pqqrmEH2yMAAAAAGEQRXA416.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 88,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Caveat-Regular",
+      "url": "group1/M00/1A/AF/rBAAM2pwbE2EbkSMAAAAAIKuC1o784.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 90,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Purple Purse Regular",
+      "url": "group1/M00/13/20/Ci0s8Wp1m8GEO4M8AAAAAA0yr9E926.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 92,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "寒蝉拙楷体裁切",
+      "url": "group1/M00/13/57/Ci0s8Wp-xByEA06OAAAAAGUYy80230.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 96,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "PatrickHand-Regular",
+      "url": "group1/M00/1B/0E/rBAAM2qAIcyENF27AAAAACpDMHI471.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 98,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Messe Duesseldorf",
+      "url": "group1/M00/13/61/Ci0s8WqAIrKEZqPkAAAAAHwIIzg469.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 100,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "zpix裁切",
+      "url": "group1/M00/13/7C/Ci0s8WqEB66ED0FkAAAAACx5JTE998.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 106,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "116*190时间（数字红色）",
+      "url": "group1/M00/1B/30/rBAAM2qFHSuEBctkAAAAAAJK1SM632.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 108,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "116*190时间（数字黑色）",
+      "url": "group1/M00/13/83/Ci0s8WqFHVCEG6uDAAAAAGGVgrk295.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 112,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "思源宋-Bold（裁剪后）",
+      "url": "group1/M00/1B/88/rBAAM2qSkLeEWuAFAAAAADUbUoc457.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 114,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Prata-Regular",
+      "url": "group1/M00/13/C0/Ci0s8WqOpM2EWxQiAAAAAN8Tnek497.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 116,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "PlayerSansMono8x8-Light",
+      "url": "group1/M00/1B/76/rBAAM2qPnEGETv5nAAAAAG0tBQk151.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 122,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Ultra-Regular",
+      "url": "group1/M00/13/DB/Ci0s8WqSmaqECXB8AAAAAJrNVNg362.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 126,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "SoukouMin裁切",
+      "url": "group1/M00/13/F3/Ci0s8WqWf4yEdtf6AAAAAAkcof8186.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 128,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "圆角矩形数字56*70",
+      "url": "group1/M00/13/F3/Ci0s8WqWjGmEaKOaAAAAAA4sXHA622.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 130,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Trueno-Light",
+      "url": "group1/M00/1B/B5/rBAAM2qaW7SEHc3SAAAAACLJ8cY215.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 132,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "104*116霓虹数字",
+      "url": "group1/M00/1B/B5/rBAAM2qaPHOEMVuDAAAAAJ3xu7w360.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 134,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "LibreBaskerville-Bold",
+      "url": "group1/M00/14/0F/Ci0s8Wqbr0GEHFqhAAAAAOQDqKs346.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 136,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "80*110数字(微渐变)",
+      "url": "group1/M00/1B/D0/rBAAM2qejiuEfi0vAAAAACZ1nPk009.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 138,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Sono-SemiBold",
+      "url": "group1/M00/1B/E0/rBAAM2qhFBKEYfZcAAAAALnCImo782.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 140,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Caveat-Bold",
+      "url": "group1/M00/14/38/Ci0s8WqiFEeEAMhIAAAAAG5p1oY802.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 142,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "资源圆体 Heavy",
+      "url": "group1/M00/14/74/Ci0s8WqroImEYioIAAAAAHuS174139.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 148,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "20*22（数字带描边）HektPix",
+      "url": "group1/M00/1C/11/rBAAM2qoupaEcwmmAAAAAGiGD7Y372.bin",
+      "charsetLength": 36,
+      "charsetPreview": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    },
+    {
+      "id": 150,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "思源宋体裁切",
+      "url": "group1/M00/14/44/Ci0s8Wqj56yEcHYUAAAAAJnxnhs774.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 152,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "芭蕾时分数字图片字体",
+      "url": "group1/M00/14/5B/Ci0s8WqnWnmEWiD9AAAAAM9q3JE786.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 154,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "74*96描边像素-数字",
+      "url": "group1/M00/14/5C/Ci0s8WqnaoyEaiYwAAAAACBEAjo718.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 156,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "76*84千禧游戏风数字",
+      "url": "group1/M00/14/65/Ci0s8Wqo9ZiECTdQAAAAAGMBtxU150.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 158,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "学习搭子数字",
+      "url": "group1/M00/1C/13/rBAAM2qpDgeEFqx_AAAAAIqK6Kw200.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 160,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "工位搭子数字",
+      "url": "group1/M00/1C/13/rBAAM2qpDjuERsusAAAAALCnKo4593.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 162,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "搞事搭子数字",
+      "url": "group1/M00/14/66/Ci0s8WqpDyKEYJFrAAAAAN8p10A614.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 164,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "60*76卡通描边（米白）数字",
+      "url": "group1/M00/1C/19/rBAAM2qqKl-EUDOtAAAAAKYSSYA427.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 166,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "92*112深蓝色数字",
+      "url": "group1/M00/1C/1B/rBAAM2qqaLuEOxufAAAAAACFYP4698.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 168,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "78*88描边圆润数字",
+      "url": "group1/M00/1C/21/rBAAM2qriM6EOaInAAAAAEziMlc041.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 170,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Fredoka One",
+      "url": "group1/M00/14/74/Ci0s8WqrpDeELG1aAAAAAPBrqic253.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 172,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "70*84毛刷数字（深褐色）",
+      "url": "group1/M00/14/79/Ci0s8WqsmRyEBohqAAAAAE1skkw740.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 174,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "刀盾狗数字字母",
+      "url": "group1/M00/1C/27/rBAAM2qszciEZMG_AAAAACnXsf0668.bin",
+      "charsetLength": 36,
+      "charsetPreview": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    },
+    {
+      "id": 176,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "BigShouldersStencil-Black",
+      "url": "group1/M00/14/7B/Ci0s8Wqs_OWEJRpcAAAAAOi6CTc769.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 178,
+      "type": 1,
+      "typeLabel": "vector_ttf",
+      "name": "Jomhuria  Regular",
+      "url": "group1/M00/14/7B/Ci0s8WqtE1-EMJ56AAAAAHLXvk4534.ttf",
+      "charsetLength": 0,
+      "charsetPreview": ""
+    },
+    {
+      "id": 180,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "80*102印刷阴影（白）数字",
+      "url": "group1/M00/14/8E/Ci0s8WqwoIWEHB42AAAAAE-cRww381.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 182,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "66*82印刷（白）数字",
+      "url": "group1/M00/1C/3C/rBAAM2qwoPuEJkHeAAAAADdud60797.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 184,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "64*70毛刷（黑）数字",
+      "url": "group1/M00/14/8F/Ci0s8Wqw2Z2EMYj2AAAAACOhR8Q869.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 188,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "30*43生日手账倒计时字体",
+      "url": "group1/M00/14/95/Ci0s8WqyE9SEIkJVAAAAAAcuf6s387.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
+    },
+    {
+      "id": 190,
+      "type": 0,
+      "typeLabel": "image_glyph",
+      "name": "24*39生日拾光倒计时数字",
+      "url": "group1/M00/1C/44/rBAAM2qyR4OEbawWAAAAAI6VwFc387.bin",
+      "charsetLength": 10,
+      "charsetPreview": "0123456789"
     }
   ]
 }

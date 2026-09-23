@@ -18,7 +18,31 @@ import {
   newWatchfaceId,
   BUNDLED_STARTER_WATCHFACE_ID
 } from "./localWatchfacesStore.js";
+import {
+  saveLocalDispAssetRecords,
+  loadLocalDispAssetRecords,
+  deleteLocalDispAssetRecords
+} from "./localDispAssetStore.js";
 import { resolveCdnFetchUrl } from "./cdnAssets.js";
+import {
+  DEVICE_JPEG_MAX_BYTES,
+  encodeCanvasForAstroToo,
+  inspectDeviceJpeg
+} from "./deviceJpegEncoder.js";
+import {
+  getDeviceClockId,
+  getUnboundLegacyClockId,
+  normalizeDeviceClockBindings,
+  withDeviceClockId
+} from "./deviceClockBindings.js";
+import {
+  encodeAppPreviewWebp,
+  getDeviceUploadState,
+  normalizeDeviceUploadStates,
+  validateAppPreviewImage,
+  withDeviceUploadState
+} from "./watchfaceUpload.js";
+import { remapUnavailableItemFonts } from "./deviceFonts.js";
 import {
   buildFontLookup,
   resolveItemFontFields,
@@ -66,6 +90,7 @@ import {
   classifyCatalogNeedsNameEnrichment,
   downloadSingleTemplateToLocal,
   enrichClassifyCatalogNames,
+  fetchAllClockRowsInClassify,
   fetchBilingualClassifyNameIndex,
   mergeClassifyCatalogSnapshots,
   pickSyncLanguage,
@@ -86,17 +111,19 @@ const ADMIN_GATE_PASSWORD = "Divoom~!@#";
 
 /** Pack ClockId for `public/defaults/starter-watchface.json` (loads `template/29` & `template/15` when present). */
 const BUNDLED_STARTER_TEMPLATE_PACK_FALLBACK_ID = 342;
-const LAN_DEVICE_HARDWARE_WHITELIST = new Set([500, 510, 511, 512]);
+const LAN_DEVICE_HARDWARE_WHITELIST = new Set([530]);
 const LAN_DEVICE_HTTP_PORT = 9000;
 /** 与固件 /create_local_clock、/patch_local_clock 第二段约定一致（参见 LAN Quick Reference：tarball 内 clock_bg.*）。 */
 const LAN_MULTIPART_DIAL_FILENAME = "clock_bg.jpg";
-/** 第二段为 gzip tar（内含 clock_bg.* 与 ItemList image_addr 叶子），与 `DialAssets: bundle` 对应。 */
-const LAN_MULTIPART_BUNDLE_FILENAME = "clock_bg.tar.gz";
+/** 第二段为 USTAR（内含 clock_bg.* 与 ItemList image_addr 叶子），与 `DialAssets: bundle` 对应。 */
+const LAN_MULTIPART_BUNDLE_FILENAME = "clock_assets.tar";
 /** 设为 1 或在地址栏加 ?lanDebug=1 后刷新：日志区输出 multipart JSON 片段等详细信息。 */
 const LAN_DEBUG_STORAGE_VERBOSE = "divoom_lan_verbose";
 const LAN_DEBUG_HISTORY_MAX = 12;
 /** 本地文件选择大小上限（字节）。 */
 const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
+const DIVOOM_JPEG_GIF_MIME = "application/x-divoom-jpeg-gif";
+const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
   const DISP_NAME_MAP = Object.freeze({
     0: "APP_ITEM_NAME2",
@@ -1015,7 +1042,48 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     489: "接下来的第四个整点温度（20°）",
     490: "歌手",
     491: "上一句歌词",
-    492: "电池电量（10 张图，按电量等级 0~9 切换）"
+    492: "电池电量（10 张图，按电量等级 0~9 切换）",
+    493: "时区(GMT+/-N)，根据系统时区自动显示",
+    494: "地区旗帜小图52*35",
+    495: "全屏趋势图片显示(先涨后跌)-国外-绿涨红跌",
+    496: "活动组件，用于AI，显示其它所有信息",
+    497: "AI表情包显示元素",
+    498: "AI文本提示",
+    499: "下一个日程标题",
+    500: "下一个日程时间 HH:MM-HH:MM",
+    501: "今日剩余活动数",
+    502: "下一活动倒计时 HH:MM:SS",
+    503: "谷歌活动颜色标识",
+    504: "谷歌日历热力图",
+    505: "AI背景",
+    506: "谷歌日历今日表盘-进行中事件行高亮框",
+    507: "今日活动（07 EVENTS TODAY）",
+    508: "表盘特殊元素1",
+    510: "饮料每60秒随机刷新，在12瓶饮料中随机抽取",
+    511: "饮料每60秒随机刷新，在12瓶饮料中随机抽取",
+    512: "文本特殊元素（情绪补给站）",
+    513: "音频来源图像（TF/BF/AUX/UAC）",
+    514: "音量图像0-16个等级",
+    515: "局部动画（雨天，雪天，雾天不显示）",
+    516: "128*128像素图",
+    517: "图片对应文本（地平线表盘）",
+    518: "闹钟标题",
+    519: "闹钟倒计时",
+    520: "闹钟时间显示",
+    521: "每日一句（30个短句随机）",
+    522: "正计时秒数显示",
+    523: "下一个节气图像",
+    524: "下一个节气倒计时天数",
+    525: "春节倒计时",
+    526: "AM/PM大写显示",
+    527: "webp2天气图",
+    528: "webp3天气图",
+    529: "四季变换图像（春夏秋冬）",
+    530: "月相名称(英文)",
+    531: "三行歌词",
+    532: "诗词短句",
+    533: "显示时间",
+    534: "日历表显示20(231*148、星期显示为日，一...六)"
   });
 
   const IMAGE_DISP_IDS = new Set([
@@ -1027,7 +1095,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     285, 286, 287, 288, 289, 290, 297, 298, 310, 348, 349, 350, 352, 359, 364, 390, 391, 394, 395, 396,
     403, 421, 423, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445,
     446, 447, 454, 455, 456, 459, 461, 462, 463, 464, 465, 470, 471, 472, 473, 475, 480, 481, 482, 483,
-    484, 492
+    484, 492, 494, 495, 497, 504, 505, 506, 508, 510, 511, 513, 514, 515, 516, 523, 527, 528, 529
   ]);
 
   /** DIVOOM_CLOCK_DISP_SUPPORT_ROTAETE_IMAGE1..4 —— divoom_disp_clock.c / dial_menu ROTATE_IMAGE（mul_flag=0） */
@@ -1312,7 +1380,19 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     482: 122,
     483: 123,
     484: 121,
-    492: 125
+    492: 125,
+    495: 128,
+    505: 126,
+    508: 131,
+    510: 132,
+    511: 133,
+    513: 134,
+    514: 135,
+    515: 136,
+    523: 111,
+    527: 129,
+    528: 130,
+    529: 137
   });
 
   const LOCAL_ASSET_DISP_RULES = new Map([
@@ -1441,7 +1521,24 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     [482, { mode: "multiple", value: 10 }],
     [483, { mode: "multiple", value: 10 }],
     [484, { mode: "multiple", value: 10 }],
-    [492, { mode: "multiple", value: 10 }]
+    [492, { mode: "multiple", value: 10 }],
+    [494, { mode: "any" }],
+    [495, { mode: "any" }],
+    [497, { mode: "any" }],
+    [504, { mode: "any" }],
+    [505, { mode: "any" }],
+    [506, { mode: "any" }],
+    [508, { mode: "any" }],
+    [510, { mode: "multiple", value: 12 }],
+    [511, { mode: "multiple", value: 12 }],
+    [513, { mode: "multiple", value: 3 }],
+    [514, { mode: "multiple", value: 17 }],
+    [515, { mode: "any" }],
+    [516, { mode: "any" }],
+    [523, { mode: "multiple", value: 24 }],
+    [527, { mode: "multiple", value: 10 }],
+    [528, { mode: "multiple", value: 10 }],
+    [529, { mode: "multiple", value: 4 }]
   ]);
 
   const DEFAULT_ITEM = Object.freeze({
@@ -1590,11 +1687,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   /**
    * 由 MIME 推断栅格资源类别（与文件名后缀无关）。
-   * `localPick: true` 时仅限用户本机选用的 JPG / WEBP / GIF（与设备常用下发格式一致）。
+   * `localPick: true` 时仅限用户本机选用的 JPG / WEBP / GIF / DIVM（与设备常用下发格式一致）。
    */
   function inferRasterFormatFromMime(mimeType, opts = {}) {
     const localPick = opts.localPick === true;
     const m = String(mimeType || "").split(";")[0].trim().toLowerCase();
+    if (m === DIVOOM_JPEG_GIF_MIME) return "jpeg_gif";
     if (m === "image/gif") return "gif";
     if (m === "image/webp") return "webp";
     if (m === "image/jpeg" || m === "image/jpg") return "jpeg";
@@ -1606,6 +1704,24 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     let s = "";
     for (let i = 0; i < len; i++) s += String.fromCharCode(bytes[start + i] || 0);
     return s;
+  }
+
+  function isDivoomJpegGifBytes(bytesLike) {
+    const bytes = bytesLike instanceof Uint8Array ? bytesLike : new Uint8Array(bytesLike || []);
+    return bytes.length >= 8 && readAscii(bytes, 0, 4) === "DIVM";
+  }
+
+  function readUint16Le(bytes, offset) {
+    return (bytes[offset] || 0) | ((bytes[offset + 1] || 0) << 8);
+  }
+
+  function readUint32Le(bytes, offset) {
+    return (
+      ((bytes[offset] || 0) |
+      ((bytes[offset + 1] || 0) << 8) |
+      ((bytes[offset + 2] || 0) << 16) |
+      ((bytes[offset + 3] || 0) << 24)) >>> 0
+    );
   }
 
   function parseGifFrameCount(buf) {
@@ -1676,6 +1792,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   function inferImageMimeFromBuffer(buf, fileName = "", mimeHint = "") {
     const bytes = new Uint8Array(buf);
+    if (isDivoomJpegGifBytes(bytes)) return DIVOOM_JPEG_GIF_MIME;
     if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
     if (
       bytes.length >= 8 &&
@@ -1701,6 +1818,40 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return "application/octet-stream";
   }
 
+  function parseDivoomJpegGifContainer(buf) {
+    const bytes = new Uint8Array(buf);
+    if (!isDivoomJpegGifBytes(bytes)) return null;
+    const frameCount = readUint16Le(bytes, 4);
+    const frameDelayMs = readUint16Le(bytes, 6);
+    const dataStart = 8 + frameCount * 4;
+    if (frameCount <= 0 || frameCount > 2000 || dataStart > bytes.length) {
+      throw new Error("invalid DIVM frame table");
+    }
+    const dataLen = bytes.length - dataStart;
+    const offsets = [];
+    for (let i = 0; i < frameCount; i += 1) {
+      offsets.push(readUint32Le(bytes, 8 + i * 4));
+    }
+    offsets.push(dataLen);
+
+    const frames = [];
+    for (let i = 0; i < frameCount; i += 1) {
+      const start = offsets[i];
+      const end = offsets[i + 1];
+      if (start > end || end > dataLen || start === end) {
+        throw new Error("invalid DIVM frame offset");
+      }
+      const frameBuf = buf.slice(dataStart + start, dataStart + end);
+      const mimeType = inferImageMimeFromBuffer(frameBuf, "", "");
+      const format = inferRasterFormatFromMime(mimeType, { localPick: false });
+      if (format !== "jpeg" && format !== "png" && format !== "webp") {
+        throw new Error("unsupported DIVM frame format");
+      }
+      frames.push({ buffer: frameBuf, mimeType, format });
+    }
+    return { frameCount, frameDelayMs, frames };
+  }
+
   function loadImageByObjectUrl(url) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -1708,6 +1859,66 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       img.onerror = () => reject(new Error("image decode failed"));
       img.src = url;
     });
+  }
+
+  async function decodeImageFrameBuffer(frameBuf, mimeType) {
+    const blob = new Blob([frameBuf], { type: mimeType });
+    if (typeof createImageBitmap === "function") {
+      return { image: await createImageBitmap(blob), objectUrl: "" };
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      return { image: await loadImageByObjectUrl(objectUrl), objectUrl };
+    } catch (e) {
+      URL.revokeObjectURL(objectUrl);
+      throw e;
+    }
+  }
+
+  async function decodeDivoomJpegGifAsset(buf) {
+    const parsed = parseDivoomJpegGifContainer(buf);
+    if (!parsed?.frames?.length) throw new Error("empty DIVM frames");
+    const frames = [];
+    const frameObjectUrls = [];
+    try {
+      const first = parsed.frames[0];
+      if (first?.format === "webp") {
+        const webpFrames = await tryDecodeAnimationFrames(first.buffer, first.mimeType);
+        if (webpFrames.length) {
+          return {
+            image: webpFrames[0],
+            frames: webpFrames,
+            frameObjectUrls,
+            frameCount: webpFrames.length,
+            frameDelayMs: parsed.frameDelayMs
+          };
+        }
+      }
+      const limit = Math.min(parsed.frames.length, DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES);
+      for (let i = 0; i < limit; i += 1) {
+        const frame = parsed.frames[i];
+        const decoded = await decodeImageFrameBuffer(frame.buffer, frame.mimeType);
+        frames.push(decoded.image);
+        if (decoded.objectUrl) frameObjectUrls.push(decoded.objectUrl);
+      }
+      return {
+        image: frames[0],
+        frames,
+        frameObjectUrls,
+        frameCount: parsed.frameCount,
+        frameDelayMs: parsed.frameDelayMs
+      };
+    } catch (e) {
+      for (const frame of frames) {
+        if (frame && typeof frame.close === "function") {
+          try { frame.close(); } catch { /* ignore */ }
+        }
+      }
+      for (const url of frameObjectUrls) {
+        try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+      }
+      throw e;
+    }
   }
 
   /** @returns {boolean} true 表示超过上限并已弹出提示（调用方应清空 input 并中止加载）。 */
@@ -1723,6 +1934,29 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const mimeType = inferImageMimeFromBuffer(buf, file?.name || "", file?.type || "");
     const fmt = inferRasterFormatFromMime(mimeType, { localPick: true });
     if (!fmt) throw new Error(t("editor.asset.formatError"));
+    if (fmt === "jpeg_gif") {
+      const objectUrl = URL.createObjectURL(new Blob([buf], { type: "application/octet-stream" }));
+      try {
+        const decoded = await decodeDivoomJpegGifAsset(buf);
+        return {
+          name: String(file.name || ""),
+          fromLocalPick: true,
+          sourceUrl: "",
+          size: toNum(file.size, 0),
+          mimeType: DIVOOM_JPEG_GIF_MIME,
+          format: fmt,
+          frameCount: decoded.frameCount,
+          frameDelayMs: decoded.frameDelayMs,
+          frames: decoded.frames,
+          frameObjectUrls: decoded.frameObjectUrls,
+          objectUrl,
+          image: decoded.image
+        };
+      } catch (e) {
+        URL.revokeObjectURL(objectUrl);
+        throw e;
+      }
+    }
     const normalizedMime = mimeType.startsWith("image/")
       ? mimeType
       : `image/${fmt === "jpeg" ? "jpeg" : fmt}`;
@@ -1776,6 +2010,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         }
       }
     }
+    if (Array.isArray(asset.frameObjectUrls)) {
+      for (const url of asset.frameObjectUrls) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
     if (asset.objectUrl) {
       try {
         URL.revokeObjectURL(asset.objectUrl);
@@ -1800,6 +2043,29 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     })();
     const mimeType = inferImageMimeFromBuffer(buf, parsedName, mimeHint);
     const format = inferRasterFormatFromMime(mimeType, { localPick: false });
+    if (format === "jpeg_gif") {
+      const objectUrl = URL.createObjectURL(new Blob([buf], { type: "application/octet-stream" }));
+      try {
+        const decoded = await decodeDivoomJpegGifAsset(buf);
+        return {
+          name: parsedName || basename(url),
+          fromLocalPick: false,
+          sourceUrl: absoluteUrlFromResolvedPath(url),
+          size: toNum(buf.byteLength, 0),
+          mimeType,
+          format,
+          frameCount: decoded.frameCount,
+          frameDelayMs: decoded.frameDelayMs,
+          frames: decoded.frames,
+          frameObjectUrls: decoded.frameObjectUrls,
+          objectUrl,
+          image: decoded.image
+        };
+      } catch (e) {
+        URL.revokeObjectURL(objectUrl);
+        throw e;
+      }
+    }
     const blob = mimeType === "application/octet-stream"
       ? new Blob([buf])
       : new Blob([buf], { type: mimeType });
@@ -1983,6 +2249,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       case 482:
       case 483:
       case 484:
+      case 527:
+      case 528:
         return Math.floor(now.getSeconds() / 6) % 10;
       case 310:
         return 0;
@@ -1997,6 +2265,17 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         return Math.min(17, Math.floor(now.getDate() % 18));
       case 492:
         return 8;
+      case 510:
+      case 511:
+        return Math.floor(now.getMinutes() / 5) % 12;
+      case 513:
+        return 0;
+      case 514:
+        return 8;
+      case 523:
+        return (day - 1) % 24;
+      case 529:
+        return Math.min(3, Math.floor((mon - 1) / 3));
       default:
         return -1;
     }
@@ -2453,7 +2732,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       return this.ttfFamilies.get(id) || "";
     }
 
-    parseFontListLike(raw) {
+    parseFontListLike(raw, { replace = false } = {}) {
       const list = Array.isArray(raw?.font_list)
         ? raw.font_list
         : Array.isArray(raw?.FontList)
@@ -2462,6 +2741,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
             ? raw
             : [];
       if (!list.length) return 0;
+      if (replace) this.fontMeta.clear();
 
       let count = 0;
       for (const item of list) {
@@ -2830,6 +3110,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     lblBgSourcePath: byId("lbl-bg-source-path"),
     lblInputAppPreviewFile: byId("lbl-input-app-preview-file"),
     lblAppPreviewSourcePath: byId("lbl-app-preview-source-path"),
+    appPreviewRequirement: byId("app-preview-requirement"),
     lblDescCn: byId("lbl-desc-cn"),
     lblDescEn: byId("lbl-desc-en"),
     lblCurrentClock: byId("lbl-current-clock"),
@@ -2852,15 +3133,46 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     btnClearAppPreview: byId("btn-clear-app-preview"),
     txtDescCn: byId("txt-desc-cn"),
     txtDescEn: byId("txt-desc-en"),
-    btnLanApplyWatchfaceConfig: byId("btn-lan-apply-config"),
     btnLanShowCurrentClockOnDevice: byId("btn-lan-show-current-clock"),
     btnLanCreateOnDevice: byId("btn-lan-create-on-device"),
+    btnLanShareWatchface: byId("btn-lan-share-watchface"),
+    btnLanReviewHistory: byId("btn-lan-review-history"),
     lanCreateDialog: byId("lan-create-dialog"),
     lanCreateForm: byId("lan-create-form"),
     lanCreateBody: byId("lan-create-body"),
     lanCreateCancel: byId("lan-create-cancel"),
     lanCreateSubmit: byId("lan-create-submit"),
     lanCreateTitle: byId("lan-create-title"),
+    lanUploadDialog: byId("lan-upload-dialog"),
+    lanUploadForm: byId("lan-upload-form"),
+    lanUploadTitle: byId("lan-upload-title"),
+    lanUploadBody: byId("lan-upload-body"),
+    lanUploadMessageField: byId("lan-upload-message-field"),
+    lanUploadMessageLabel: byId("lan-upload-message-label"),
+    lanUploadMessage: byId("lan-upload-message"),
+    lanUploadMessageHint: byId("lan-upload-message-hint"),
+    lanUploadMessageError: byId("lan-upload-message-error"),
+    lanUploadSharePublic: byId("lan-upload-share-public"),
+    lanUploadSharePublicLabel: byId("lan-upload-share-public-label"),
+    lanUploadClassifyField: byId("lan-upload-classify-field"),
+    lanUploadClassifyLabel: byId("lan-upload-classify-label"),
+    lanUploadClassify: byId("lan-upload-classify"),
+    lanUploadClassifyHint: byId("lan-upload-classify-hint"),
+    lanUploadClassifyError: byId("lan-upload-classify-error"),
+    lanUploadReviewNote: byId("lan-upload-review-note"),
+    lanUploadCancel: byId("lan-upload-cancel"),
+    lanUploadSubmit: byId("lan-upload-submit"),
+    lanReviewDialog: byId("lan-review-dialog"),
+    lanReviewTitle: byId("lan-review-title"),
+    lanReviewContext: byId("lan-review-context"),
+    lanReviewStatusLabel: byId("lan-review-status-label"),
+    lanReviewStatus: byId("lan-review-status"),
+    lanReviewStatusNote: byId("lan-review-status-note"),
+    lanReviewListTitle: byId("lan-review-list-title"),
+    lanReviewList: byId("lan-review-list"),
+    lanReviewEmpty: byId("lan-review-empty"),
+    lanReviewRefresh: byId("lan-review-refresh"),
+    lanReviewClose: byId("lan-review-close"),
     lanMessageDialog: byId("lan-message-dialog"),
     lanMessageDialogBody: byId("lan-message-dialog-body"),
     lanMessageDialogOk: byId("lan-message-dialog-ok"),
@@ -2981,9 +3293,25 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   let photoAlbumDemoImages = [];
   const photoAlbumPreviewItemState = new WeakMap();
 
-  let lanBaselineSignature = "";
-  /** 上次 captureLanBaseline 时的背景名，用于在 PATCH 时判断 dial 底图是否需要重传。 */
-  let lanBaselineBgName = "";
+  let lanDeviceRevision = 0;
+  let lanUploadRevision = 0;
+  let lastLanDeviceSnapshot = "";
+  let lastLanUploadSnapshot = "";
+  const lanDeviceAppliedRevisions = new Map();
+  const lanUploadedRevisions = new Map();
+  const lanDeviceBaselineSnapshots = new Map();
+  const lanUploadBaselineSnapshots = new Map();
+  const lanAssetIdentity = new WeakMap();
+  let nextLanAssetIdentity = 1;
+  let lanShareBusy = false;
+  let lanSyncBusy = false;
+  let lanReviewRequestToken = 0;
+  const localWatchClockStatusByDevice = new Map();
+  let localWatchStatusRequestSeq = 0;
+  let lanReviewView = {
+    phase: "idle", deviceId: 0, clockId: 0, records: [], error: "",
+    statusPhase: "idle", statusCode: null, statusError: ""
+  };
 
   /**
    * 设备 PATCH（`wf_apply_item_patch` in `divoom_watchface_local_api.c`）允许按字段级补丁的列表。
@@ -3009,10 +3337,17 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   /** 「我的设计」当前条目 id（空 = 未绑定已命名保存） */
   let activeLocalWatchfaceId = "";
+  /** 当前本地表盘的 DeviceId -> ClockId 绑定。 */
+  let activeDeviceClockIds = {};
+  /** 当前本地表盘按 DeviceId 保存的线上上传状态。 */
+  let activeDeviceUploadStates = {};
+  /** v1 记录在首次明确选择设备前暂存的 ClockId，避免启动阶段被清零。 */
+  let activeUnboundLegacyClockId = 0;
   /** 判断相对上次保存/加载是否有修改（含未命名草稿） */
   let workspaceBaselineSig = "";
   let namingPromptDismissed = false;
   let autosaveTimer = 0;
+  let persistQueue = Promise.resolve();
   let namingDebounceTimer = 0;
   /** 文件选择等原生对话框需要主线程空闲；>0 时暂停表盘预览定时器。 */
   let watchfaceTickPauseDepth = 0;
@@ -3067,6 +3402,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   };
 
   const localDispAssets = new Map();
+  const localDispPersistDataUrls = new WeakMap();
 
   function getLocalDispAsset(item) {
     return item ? (localDispAssets.get(item) || null) : null;
@@ -3543,13 +3879,27 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (dom.lblBgSourcePath) setNodeText(dom.lblBgSourcePath, t("ui.label.bgSourcePath"));
     if (dom.lblInputAppPreviewFile) setNodeText(dom.lblInputAppPreviewFile, t("ui.label.appPreviewFile"));
     if (dom.lblAppPreviewSourcePath) setNodeText(dom.lblAppPreviewSourcePath, t("ui.label.appPreviewSourcePath"));
+    if (dom.appPreviewRequirement) setNodeText(dom.appPreviewRequirement, t("ui.appPreview.requirement"));
     setNodeText(dom.btnClearBg, t("ui.btn.clearBg"));
     if (dom.btnClearAppPreview) setNodeText(dom.btnClearAppPreview, t("ui.btn.clearAppPreview"));
-    if (dom.btnLanApplyWatchfaceConfig)
-      setNodeText(dom.btnLanApplyWatchfaceConfig, t("ui.btn.lanApplyWatchfaceConfig"));
     if (dom.btnLanShowCurrentClockOnDevice)
       setNodeText(dom.btnLanShowCurrentClockOnDevice, t("ui.btn.lanShowCurrentClockOnDevice"));
-    if (dom.btnLanCreateOnDevice) setNodeText(dom.btnLanCreateOnDevice, t("ui.btn.lanCreate"));
+    if (dom.btnLanCreateOnDevice) setNodeText(dom.btnLanCreateOnDevice,
+      t(toNum(state.config?.ClockId, 0) > 0 ? "ui.btn.lanApplyWatchfaceConfig" : "ui.btn.lanCreate"));
+    if (dom.btnLanShareWatchface) {
+      setNodeText(dom.btnLanShareWatchface, t(lanShareBusy ? "lan.share.busy" : lanUploadButtonTranslationKey()));
+      dom.btnLanShareWatchface.title = t("lan.share.hint");
+    }
+    setNodeText(dom.btnLanReviewHistory, t("ui.btn.lanReviewHistory"));
+    if (dom.lanUploadMessageLabel) setNodeText(dom.lanUploadMessageLabel, t("lan.upload.messageLabel"));
+    if (dom.lanUploadMessageHint) setNodeText(dom.lanUploadMessageHint, t("lan.upload.messageHint"));
+    if (dom.lanUploadMessageError) setNodeText(dom.lanUploadMessageError, t("lan.upload.messageRequired"));
+    if (dom.lanUploadSharePublicLabel) setNodeText(dom.lanUploadSharePublicLabel, t("lan.upload.sharePublic"));
+    if (dom.lanUploadClassifyLabel) setNodeText(dom.lanUploadClassifyLabel, t("lan.upload.classifyLabel"));
+    if (dom.lanUploadClassifyHint) setNodeText(dom.lanUploadClassifyHint, t("lan.upload.classifyHint"));
+    if (dom.lanUploadClassifyError) setNodeText(dom.lanUploadClassifyError, t("lan.upload.classifyRequired"));
+    if (dom.lanUploadCancel) setNodeText(dom.lanUploadCancel, t("lan.upload.cancel"));
+    refreshLanUploadDialogReviewNote();
     if (dom.lanCreateTitle) setNodeText(dom.lanCreateTitle, t("lan.dialog.confirmCreateTitle"));
     if (dom.lanCreateCancel) setNodeText(dom.lanCreateCancel, t("lan.dialog.cancel"));
     if (dom.lanCreateSubmit) setNodeText(dom.lanCreateSubmit, t("lan.dialog.submit"));
@@ -3600,10 +3950,14 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     refreshItemListUi();
     refreshTemplateCategorySelectorUi();
     refreshTemplateListUi();
+    refreshPendingTemplateCategoryUi();
+    refreshPendingTemplateListUi();
+    void ensureSelectedPendingTemplateNames();
     rebuildItemEditor();
     renderWatchface();
     renderFontPreview();
     refreshLanActionButtons();
+    if (dom.lanReviewDialog?.open) renderLanReviewHistory();
     refreshLocalWatchfaceListUi();
     refreshSidebarBrowseChrome();
   }
@@ -3772,10 +4126,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   function getTemplateClassifyDisplayName(row) {
     const nameCn = String(row?.ClassifyName || "").trim();
-    const nameEn = String(row?.ClassifyNameEn || "").trim();
+    const nameEn = englishCatalogText(row?.ClassifyNameEn);
     const fallbackId = toNum(row?.ClassifyId, 0);
     const fallback = fallbackId > 0 ? `Classify ${fallbackId}` : t("ui.default.untitled");
-    return localizedDualName(nameCn, nameEn, fallback);
+    return isUiZhCnLocale() ? localizedDualName(nameCn, nameEn, fallback) : (nameEn || fallback);
+  }
+
+  function englishCatalogText(value) {
+    const name = String(value || "").trim();
+    return /[\u3400-\u9fff]/.test(name) ? "" : name;
   }
 
   function getSelectedTemplateClassifyRow() {
@@ -3979,15 +4338,163 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
   }
 
-  function captureLanBaseline() {
-    lanBaselineSignature = getLanDirtySnapshot();
-    lanBaselineBgName = String(state.backgroundName || "");
+  function lanAssetKey(asset) {
+    if (!asset || typeof asset !== "object") return 0;
+    if (!lanAssetIdentity.has(asset)) {
+      const source = String(asset.src || asset.sourceUrl || asset.objectUrl || "");
+      if (source) {
+        let hash = 2166136261;
+        for (let i = 0; i < source.length; i += 1) hash = Math.imul(hash ^ source.charCodeAt(i), 16777619);
+        lanAssetIdentity.set(asset, `${source.length}:${(hash >>> 0).toString(16)}:${asset.size || 0}`);
+      } else {
+        lanAssetIdentity.set(asset, nextLanAssetIdentity++);
+      }
+    }
+    return lanAssetIdentity.get(asset);
+  }
+
+  function restoreLanAssetKey(asset, key) {
+    if (!asset || !((typeof key === "string" && key.length <= 128) ||
+        (Number.isSafeInteger(key) && key > 0))) return;
+    lanAssetIdentity.set(asset, key);
+    if (typeof key === "number") nextLanAssetIdentity = Math.max(nextLanAssetIdentity, key + 1);
+  }
+
+  /** Device/CreateLocalClock and Device/PatchLocalClockInfo content only. */
+  function getLanDeviceSnapshot() {
+    if (!state.config) return "";
+    syncItemIdList();
+    const creating = toNum(state.config.ClockId, 0) <= 0;
+    const items = state.config.ItemList.map((item) => {
+      if (creating) return { ...item };
+      const patchable = {};
+      for (const field of LAN_PATCH_NUMBER_FIELDS) patchable[field] = item[field];
+      for (const field of LAN_PATCH_HEX_COLOR_FIELDS) patchable[field] = item[field];
+      patchable.image_addr = item.image_addr;
+      return patchable;
+    });
+    return JSON.stringify({
+      name: creating ? resolveLanDeviceCreateClockName() : "",
+      items,
+      background: lanAssetKey(state.backgroundImage),
+      itemAssets: state.config.ItemList.map((item) => lanAssetKey(getLocalDispAsset(item)))
+    });
+  }
+
+  function getLanUploadSnapshot() {
+    return JSON.stringify({
+      device: getLanDeviceSnapshot(),
+      name: resolveLanDeviceCreateClockName(),
+      appPreview: lanAssetKey(state.appPreviewImage)
+    });
+  }
+
+  function hasLanDeviceChanges() {
+    const deviceId = resolveClockBindingDeviceId();
+    // A saved design deployed to another device is new work for this device,
+    // even if its content has not changed since the last local save.
+    if (activeLocalWatchfaceId && getDeviceClockId(activeDeviceClockIds, deviceId) <= 0 &&
+        Object.keys(activeDeviceClockIds).length > 0) return true;
+    if (lanDeviceBaselineSnapshots.get(deviceId) === getLanDeviceSnapshot()) return false;
+    return lanDeviceRevision > (lanDeviceAppliedRevisions.get(deviceId) || 0);
+  }
+
+  function hasLanUploadChanges() {
+    const deviceId = resolveClockBindingDeviceId();
+    if (lanUploadBaselineSnapshots.get(deviceId) === getLanUploadSnapshot()) return false;
+    return lanUploadRevision > (lanUploadedRevisions.get(deviceId) || 0);
+  }
+
+  function resetLanActionBaselines() {
+    lanDeviceRevision = 0;
+    lanUploadRevision = 0;
+    lanDeviceAppliedRevisions.clear();
+    lanUploadedRevisions.clear();
+    lanDeviceBaselineSnapshots.clear();
+    lanUploadBaselineSnapshots.clear();
+    lastLanDeviceSnapshot = getLanDeviceSnapshot();
+    lastLanUploadSnapshot = getLanUploadSnapshot();
+    const deviceId = resolveClockBindingDeviceId();
+    lanDeviceBaselineSnapshots.set(deviceId, lastLanDeviceSnapshot);
+    lanUploadBaselineSnapshots.set(deviceId, lastLanUploadSnapshot);
     refreshLanActionButtons();
   }
 
-  /** 用户是否在自上次 baseline 后换过 dial 底图（按 `state.backgroundName` 比对）。 */
-  function isLanBackgroundDirtyAgainstBaseline() {
-    return String(state.backgroundName || "") !== String(lanBaselineBgName || "");
+  function rebaseCleanLanAssetSnapshots() {
+    const selectedId = resolveClockBindingDeviceId();
+    if (getDeviceClockId(activeDeviceClockIds, selectedId) <= 0) return;
+    // A local blob: URL becomes a data: URL after reopening. Only a device
+    // already at the latest applied/uploaded revision can safely adopt the
+    // restored asset fingerprint; older baselines must remain untouched.
+    const deviceSnapshot = getLanDeviceSnapshot();
+    const uploadSnapshot = getLanUploadSnapshot();
+    for (const [id, revision] of lanDeviceAppliedRevisions) {
+      if (revision === lanDeviceRevision && getDeviceClockId(activeDeviceClockIds, id) > 0) {
+        lanDeviceBaselineSnapshots.set(id, deviceSnapshot);
+      }
+    }
+    for (const [id, revision] of lanUploadedRevisions) {
+      if (revision === lanUploadRevision && getDeviceClockId(activeDeviceClockIds, id) > 0) {
+        lanUploadBaselineSnapshots.set(id, uploadSnapshot);
+      }
+    }
+  }
+
+  function restoreLanActionRevisions(record) {
+    resetLanActionBaselines();
+    const revisions = record?.lanActionRevisions;
+    lanDeviceRevision = Math.max(0, toNum(revisions?.device, 0));
+    lanUploadRevision = Math.max(0, toNum(revisions?.upload, 0));
+    for (const [deviceId, revision] of Object.entries(revisions?.appliedByDevice || {})) {
+      const id = toNum(deviceId, 0);
+      if (id > 0) lanDeviceAppliedRevisions.set(id, Math.min(lanDeviceRevision, Math.max(0, toNum(revision, 0))));
+    }
+    for (const [deviceId, revision] of Object.entries(revisions?.uploadedByDevice || {})) {
+      const id = toNum(deviceId, 0);
+      if (id > 0) lanUploadedRevisions.set(id, Math.min(lanUploadRevision, Math.max(0, toNum(revision, 0))));
+    }
+    const deviceId = resolveClockBindingDeviceId();
+    for (const [id, snapshot] of Object.entries(revisions?.deviceSnapshots || {})) {
+      if (toNum(id, 0) > 0 && typeof snapshot === "string") lanDeviceBaselineSnapshots.set(toNum(id, 0), snapshot);
+    }
+    for (const [id, snapshot] of Object.entries(revisions?.uploadSnapshots || {})) {
+      if (toNum(id, 0) > 0 && typeof snapshot === "string") lanUploadBaselineSnapshots.set(toNum(id, 0), snapshot);
+    }
+    if (lanDeviceRevision > (lanDeviceAppliedRevisions.get(deviceId) || 0) && !revisions?.deviceSnapshots?.[deviceId]) lanDeviceBaselineSnapshots.delete(deviceId);
+    if (lanUploadRevision > (lanUploadedRevisions.get(deviceId) || 0) && !revisions?.uploadSnapshots?.[deviceId]) lanUploadBaselineSnapshots.delete(deviceId);
+    rebaseCleanLanAssetSnapshots();
+    refreshLanActionButtons();
+  }
+
+  function noteLanContentEdited() {
+    const deviceSnapshot = getLanDeviceSnapshot();
+    const uploadSnapshot = getLanUploadSnapshot();
+    if (deviceSnapshot !== lastLanDeviceSnapshot) lanDeviceRevision += 1;
+    if (uploadSnapshot !== lastLanUploadSnapshot) lanUploadRevision += 1;
+    lastLanDeviceSnapshot = deviceSnapshot;
+    lastLanUploadSnapshot = uploadSnapshot;
+    for (const [deviceId, baseline] of lanDeviceBaselineSnapshots) {
+      if (deviceSnapshot === baseline) lanDeviceAppliedRevisions.set(deviceId, lanDeviceRevision);
+    }
+    for (const [deviceId, baseline] of lanUploadBaselineSnapshots) {
+      if (uploadSnapshot === baseline) lanUploadedRevisions.set(deviceId, lanUploadRevision);
+    }
+  }
+
+  function captureLanBaseline() {
+    const deviceId = resolveClockBindingDeviceId();
+    lanDeviceAppliedRevisions.set(deviceId, lanDeviceRevision);
+    lastLanDeviceSnapshot = getLanDeviceSnapshot();
+    lanDeviceBaselineSnapshots.set(deviceId, lastLanDeviceSnapshot);
+    refreshLanActionButtons();
+  }
+
+  function captureLanUploadBaseline() {
+    const deviceId = resolveClockBindingDeviceId();
+    lanUploadedRevisions.set(deviceId, lanUploadRevision);
+    lastLanUploadSnapshot = getLanUploadSnapshot();
+    lanUploadBaselineSnapshots.set(deviceId, lastLanUploadSnapshot);
+    refreshLanActionButtons();
   }
 
   /** 顶部下拉是否已选具体设备（`value=""` 占位符视为未选）。 */
@@ -4002,42 +4509,223 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return Boolean(getLanTargetBase());
   }
 
+  function resolveClockBindingDeviceId() {
+    const selected = toNum(resolveSelectedLanDeviceId(), 0);
+    if (selected > 0) return selected;
+    try {
+      return toNum(localStorage.getItem("divoom_lan_selected_device_id"), 0);
+    } catch {
+      return 0;
+    }
+  }
+
+  function applyCurrentDeviceClockBinding() {
+    if (!state.config || !activeLocalWatchfaceId) return 0;
+    const deviceId = resolveClockBindingDeviceId();
+    let clockId = getDeviceClockId(activeDeviceClockIds, deviceId);
+    if (clockId <= 0 && deviceId > 0 && activeUnboundLegacyClockId > 0) {
+      clockId = activeUnboundLegacyClockId;
+      activeDeviceClockIds = withDeviceClockId(activeDeviceClockIds, deviceId, clockId);
+      activeUnboundLegacyClockId = 0;
+    }
+    state.config.ClockId = clockId;
+    rebaseCleanLanAssetSnapshots();
+    refreshToolbarClockIdUi();
+    refreshLanActionButtons();
+    refreshLocalWatchfaceListUi();
+    return clockId;
+  }
+
+  function activeOnlineUploadState() {
+    return getDeviceUploadState(
+      activeDeviceUploadStates,
+      resolveClockBindingDeviceId(),
+      toNum(state.config?.ClockId, 0)
+    );
+  }
+
+  function lanUploadButtonTranslationKey() {
+    return activeOnlineUploadState() ? "ui.btn.lanUpdateOnline" : "ui.btn.lanShare";
+  }
+
+  function formatLanReviewTime(value) {
+    const raw = Number(value);
+    if (!Number.isFinite(raw) || raw <= 0) return "";
+    const date = new Date(raw < 1e12 ? raw * 1000 : raw);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(getLocaleCode());
+  }
+
+  function lanReviewActorLabel(isUser) {
+    return t(isUser === 0 ? "lan.review.actorAdmin"
+      : isUser === 1 ? "lan.review.actorUser" : "lan.review.actorUnknown");
+  }
+
+  function lanClockStatusLabel(status) {
+    const keys = ["private", "waitingUser", "waitingAdmin", "approved", "rejected"];
+    return Number.isInteger(status) && keys[status]
+      ? t(`lan.review.clockStatus.${keys[status]}`)
+      : t("lan.review.clockStatus.unknown", { status: Number.isFinite(status) ? status : "-" });
+  }
+
+  async function refreshLocalWatchfaceStatusForDevice({ force = false } = {}) {
+    const deviceId = resolveClockBindingDeviceId();
+    if (deviceId <= 0) {
+      refreshLocalWatchfaceListUi();
+      return;
+    }
+    const cached = localWatchClockStatusByDevice.get(deviceId);
+    if (!force && (cached?.phase === "ready" || cached?.phase === "loading")) return;
+    const seq = ++localWatchStatusRequestSeq;
+    localWatchClockStatusByDevice.set(deviceId, { phase: "loading", seq, statuses: cached?.statuses || new Map() });
+    refreshLocalWatchfaceListUi();
+    try {
+      const data = await divoomStoreJson("Channel/GetDeviceClockInfo", { DeviceId: deviceId });
+      if (!Array.isArray(data?.ClockList)) throw new Error(t("lan.review.invalidStatusResponse"));
+      const statuses = new Map(data.ClockList
+        .filter((row) => Number(row?.ClockId) > 0)
+        .map((row) => [Number(row.ClockId), row.Status == null ? NaN : Number(row.Status)]));
+      if (localWatchClockStatusByDevice.get(deviceId)?.seq !== seq) return;
+      localWatchClockStatusByDevice.set(deviceId, { phase: "ready", seq, statuses });
+    } catch (error) {
+      if (localWatchClockStatusByDevice.get(deviceId)?.seq !== seq) return;
+      localWatchClockStatusByDevice.set(deviceId, { phase: "error", seq, error: errorToText(error) });
+    }
+    if (resolveClockBindingDeviceId() === deviceId) refreshLocalWatchfaceListUi();
+  }
+
+  function localWatchfaceStatus(deviceId, clockId) {
+    if (deviceId <= 0 || clockId <= 0) return { key: "local", tip: "local" };
+    const cached = localWatchClockStatusByDevice.get(deviceId);
+    if (!cached || cached.phase === "loading") return { key: "loading", tip: "loading" };
+    if (cached.phase === "error") return { key: "unknown", tip: "unknown" };
+    const status = cached.statuses.get(clockId);
+    const keys = ["private", "waitingUser", "waitingAdmin", "approved", "rejected"];
+    if (status == null) return { key: "local", tip: "local" };
+    return { key: keys[status] || "unknown", tip: keys[status] || "unknown" };
+  }
+
+  function renderLanReviewHistory() {
+    const { phase, deviceId, clockId, records, error, statusPhase, statusCode, statusError } = lanReviewView;
+    setNodeText(dom.lanReviewTitle, t("lan.review.title"));
+    setNodeText(dom.lanReviewContext, t("lan.review.context", { deviceId, clockId }));
+    setNodeText(dom.lanReviewStatusLabel, t("lan.review.statusLabel"));
+    setNodeText(dom.lanReviewStatus, statusPhase === "loading" ? t("lan.review.statusLoading")
+      : statusPhase === "error" ? t("lan.review.statusLoadFailed")
+      : statusPhase === "missing" ? t("lan.review.statusNotListed")
+      : statusPhase === "ready" ? lanClockStatusLabel(statusCode)
+      : "");
+    if (dom.lanReviewStatus) {
+      dom.lanReviewStatus.className = statusPhase !== "ready" ? ""
+        : statusCode === 3 ? "lan-review-status--approved"
+        : statusCode === 4 ? "lan-review-status--rejected"
+        : statusCode === 1 || statusCode === 2 ? "lan-review-status--pending" : "";
+    }
+    setNodeText(dom.lanReviewStatusNote, statusPhase === "error" ? statusError
+      : statusPhase === "ready" ? t("lan.review.statusSource") : "");
+    setNodeText(dom.lanReviewListTitle, t("lan.review.recordsTitle"));
+    if (dom.lanReviewList) {
+      dom.lanReviewList.replaceChildren();
+      for (const record of records) {
+        const row = document.createElement("li");
+        row.className = record.isUser === 0 ? "lan-review-entry--admin"
+          : record.isUser === 1 ? "lan-review-entry--user" : "";
+        const title = document.createElement("strong");
+        const detail = document.createElement("span");
+        title.textContent = lanReviewActorLabel(record.isUser);
+        const time = formatLanReviewTime(record.updateTime);
+        detail.textContent = [record.reviewDesc && t("lan.review.reviewDesc", { description: record.reviewDesc }),
+          time && t("lan.review.recordTime", { time })].filter(Boolean).join(" · ");
+        row.append(title, detail);
+        dom.lanReviewList.appendChild(row);
+      }
+    }
+    if (dom.lanReviewEmpty) {
+      dom.lanReviewEmpty.hidden = records.length > 0;
+      setNodeText(dom.lanReviewEmpty, phase === "loading" ? t("lan.review.loading")
+        : phase === "error" ? `${t("lan.review.loadFailed")}：${error}` : t("lan.review.recordsEmpty"));
+    }
+    if (dom.lanReviewRefresh) {
+      dom.lanReviewRefresh.disabled = phase === "loading" || statusPhase === "loading";
+      setNodeText(dom.lanReviewRefresh, t("lan.review.refresh"));
+    }
+    setNodeText(dom.lanReviewClose, t("lan.review.close"));
+  }
+
+  async function loadLanReviewHistory() {
+    const deviceId = resolveClockBindingDeviceId();
+    const clockId = toNum(state.config?.ClockId, 0);
+    if (deviceId <= 0 || clockId <= 0) return;
+    const token = ++lanReviewRequestToken;
+    lanReviewView = {
+      phase: "loading", deviceId, clockId, records: [], error: "",
+      statusPhase: "loading", statusCode: null, statusError: ""
+    };
+    renderLanReviewHistory();
+    // Both requests go directly to the cloud; a failure in one must not hide the other.
+    const [clockResult, reviewResult] = await Promise.allSettled([
+      divoomStoreJson("Channel/GetDeviceClockInfo", { DeviceId: deviceId }),
+      divoomStoreJson("Channel/GetUserClockReview", { DeviceId: deviceId, ClockId: clockId })
+    ]);
+    if (token !== lanReviewRequestToken) return;
+    const next = {
+      phase: "ready", deviceId, clockId, records: [], error: "",
+      statusPhase: "ready", statusCode: null, statusError: ""
+    };
+    try {
+      if (clockResult.status === "rejected") throw clockResult.reason;
+      if (!Array.isArray(clockResult.value?.ClockList)) throw new Error(t("lan.review.invalidStatusResponse"));
+      localWatchClockStatusByDevice.set(deviceId, {
+        phase: "ready", seq: ++localWatchStatusRequestSeq,
+        statuses: new Map(clockResult.value.ClockList
+          .filter((row) => Number(row?.ClockId) > 0)
+          .map((row) => [Number(row.ClockId), row.Status == null ? NaN : Number(row.Status)]))
+      });
+      if (resolveClockBindingDeviceId() === deviceId) refreshLocalWatchfaceListUi();
+      const clock = clockResult.value.ClockList.find((row) => Number(row?.ClockId) === clockId);
+      if (!clock) next.statusPhase = "missing";
+      else next.statusCode = clock.Status == null ? NaN : Number(clock.Status);
+    } catch (e) {
+      next.statusPhase = "error";
+      next.statusError = errorToText(e);
+    }
+    try {
+      if (reviewResult.status === "rejected") throw reviewResult.reason;
+      if (!Array.isArray(reviewResult.value?.ReviewList)) throw new Error(t("lan.review.invalidResponse"));
+      next.records = reviewResult.value.ReviewList.map((row) => ({
+        isUser: row?.IsUser == null ? -1 : Number(row.IsUser),
+        reviewDesc: String(row?.ReviewDesc || "").trim(),
+        updateTime: Number(row?.UpdateTime) || 0
+      })).sort((a, b) => b.updateTime - a.updateTime);
+    } catch (e) {
+      next.phase = "error";
+      next.error = errorToText(e);
+    }
+    lanReviewView = next;
+    renderLanReviewHistory();
+  }
+
   function refreshLanActionButtons() {
-    const applyBtn = dom.btnLanApplyWatchfaceConfig;
     const createBtn = dom.btnLanCreateOnDevice;
     const showClockBtn = dom.btnLanShowCurrentClockOnDevice;
     const hasClockId = toNum(state.config?.ClockId, 0) > 0;
     const hasLanDevice = isLanDeviceSelectedInUi();
-    if (sidebarBrowseMode === "template") {
-      if (applyBtn) applyBtn.disabled = true;
-      if (createBtn) createBtn.disabled = true;
-      if (showClockBtn) showClockBtn.hidden = true;
-      return;
+    const canUseLan = !lanShareBusy && !lanSyncBusy && sidebarBrowseMode !== "template" &&
+      hasLanDevice && hasLanDeviceHttpTarget();
+    if (createBtn) {
+      createBtn.disabled = !canUseLan || !hasLanDeviceChanges();
+      setNodeText(createBtn, t(hasClockId ? "ui.btn.lanApplyWatchfaceConfig" : "ui.btn.lanCreate"));
     }
-    if (!hasLanDevice) {
-      if (applyBtn) applyBtn.disabled = true;
-      if (createBtn) createBtn.disabled = true;
-      if (showClockBtn) {
-        showClockBtn.hidden = !hasClockId;
-        showClockBtn.disabled = true;
-      }
-      return;
+    if (dom.btnLanShareWatchface) {
+      dom.btnLanShareWatchface.disabled = !canUseLan || !hasClockId || !hasLanUploadChanges();
+      dom.btnLanShareWatchface.setAttribute("aria-busy", lanShareBusy ? "true" : "false");
+      setNodeText(dom.btnLanShareWatchface, t(lanShareBusy ? "lan.share.busy" : lanUploadButtonTranslationKey()));
     }
-    if (!hasLanDeviceHttpTarget()) {
-      if (applyBtn) applyBtn.disabled = true;
-      if (createBtn) createBtn.disabled = true;
-      if (showClockBtn) {
-        showClockBtn.hidden = !hasClockId;
-        showClockBtn.disabled = true;
-      }
-      return;
+    if (dom.btnLanReviewHistory) {
+      dom.btnLanReviewHistory.disabled = !hasClockId || !hasLanDevice || sidebarBrowseMode === "template";
     }
-    const dirty = getLanDirtySnapshot() !== lanBaselineSignature;
-    if (applyBtn) applyBtn.disabled = !hasClockId || !dirty;
-    if (createBtn) createBtn.disabled = hasClockId;
     if (showClockBtn) {
-      showClockBtn.hidden = !hasClockId;
-      showClockBtn.disabled = false;
+      showClockBtn.hidden = !hasClockId || sidebarBrowseMode === "template";
+      showClockBtn.disabled = !canUseLan;
     }
   }
 
@@ -4089,6 +4777,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   function onLocalConfigEdited() {
+    noteLanContentEdited();
     refreshLanActionButtons();
     scheduleWorkspaceAutosave();
     scheduleDeferredNamingPrompt();
@@ -4227,6 +4916,23 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
   }
 
+  async function localDispAssetDataUrlForPersist(asset) {
+    if (!asset?.fromLocalPick || !asset.objectUrl) return "";
+    const cached = localDispPersistDataUrls.get(asset);
+    if (cached) return cached;
+    const response = await fetch(asset.objectUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("image read failed"));
+      reader.readAsDataURL(blob);
+    });
+    localDispPersistDataUrls.set(asset, dataUrl);
+    return dataUrl;
+  }
+
   function persistImageCacheKey(img, name) {
     if (!img || !img.complete || img.naturalWidth <= 0) return "";
     const src = String(img.src || "");
@@ -4331,44 +5037,138 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     fontStore.log(t("log.bundledStarterSeeded", { name: rowName }));
   }
 
-  async function flushPersistActiveWorkspace() {
-    if (!activeLocalWatchfaceId) return;
-    const existing = getWatchface(activeLocalWatchfaceId);
+  function flushPersistActiveWorkspace() {
+    const watchfaceId = activeLocalWatchfaceId;
+    if (!watchfaceId) return Promise.resolve(false);
+    const queued = persistQueue.then(async () => {
+      if (watchfaceId !== activeLocalWatchfaceId) return false;
+      try {
+        return await doFlushPersistActiveWorkspace(watchfaceId);
+      } catch (e) {
+        alert(t("localWatch.errQuota", { message: errorToText(e) }));
+        return false;
+      }
+    });
+    persistQueue = queued;
+    return queued;
+  }
+
+  async function doFlushPersistActiveWorkspace(watchfaceId) {
+    const existing = getWatchface(watchfaceId);
     const nm = String(
       getClockDisplayName(state.config) || existing?.name || t("ui.default.untitled")
     ).trim();
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const bgUrl = await cachedImageDataUrlForPersist("bg", state.backgroundImage, state.backgroundName);
-    const appPreviewUrl = await cachedImageDataUrlForPersist(
-      "appPreview",
-      state.appPreviewImage,
-      state.appPreviewName
-    );
     syncItemIdList();
-    const previewOverrides = Object.fromEntries(state.previewTextOverrides);
-    const rec = {
-      id: activeLocalWatchfaceId,
-      name: nm,
-      updatedAt: Date.now(),
+    activeDeviceClockIds = withDeviceClockId(
+      activeDeviceClockIds,
+      resolveClockBindingDeviceId(),
+      state.config.ClockId
+    );
+    const savedSig = getLanDirtySnapshot();
+    const workspace = {
       config: JSON.parse(JSON.stringify(state.config)),
-      backgroundDataUrl: bgUrl,
+      itemAssets: state.config.ItemList.map((item) => getLocalDispAsset(item)),
+      backgroundImage: state.backgroundImage,
       backgroundName: state.backgroundName || "",
       backgroundSourceLabel: state.backgroundSourceLabel || "",
-      appPreviewDataUrl: appPreviewUrl,
+      appPreviewImage: state.appPreviewImage,
       appPreviewName: state.appPreviewName || "",
       appPreviewSourceLabel: state.appPreviewSourceLabel || "",
       width: state.width,
       height: state.height,
       zoom: state.zoom,
-      previewOverrides,
-      templateActiveClockId: templateState.activeClockId
+      previewOverrides: Object.fromEntries(state.previewTextOverrides),
+      templateActiveClockId: templateState.activeClockId,
+      deviceClockIds: { ...activeDeviceClockIds },
+      deviceUploadStates: JSON.parse(JSON.stringify(activeDeviceUploadStates)),
+      lanActionRevisions: {
+        device: lanDeviceRevision,
+        upload: lanUploadRevision,
+        appliedByDevice: Object.fromEntries(lanDeviceAppliedRevisions),
+        uploadedByDevice: Object.fromEntries(lanUploadedRevisions),
+        deviceSnapshots: Object.fromEntries(lanDeviceBaselineSnapshots),
+        uploadSnapshots: Object.fromEntries(lanUploadBaselineSnapshots)
+      },
+      unboundLegacyClockId: activeUnboundLegacyClockId
+    };
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    const bgUrl = await cachedImageDataUrlForPersist("bg", workspace.backgroundImage, workspace.backgroundName);
+    const appPreviewUrl = await cachedImageDataUrlForPersist(
+      "appPreview",
+      workspace.appPreviewImage,
+      workspace.appPreviewName
+    );
+    const savedLocalDispAssets = [];
+    for (let index = 0; index < workspace.config.ItemList.length; index += 1) {
+      const item = workspace.config.ItemList[index];
+      const asset = workspace.itemAssets[index];
+      if (!asset?.fromLocalPick) continue;
+      const dataUrl = await localDispAssetDataUrlForPersist(asset);
+      if (dataUrl) savedLocalDispAssets.push({
+        index,
+        itemId: String(item.item_id || ""),
+        name: String(asset.name || item.image_addr || ""),
+        mimeType: String(asset.mimeType || ""),
+        assetKey: lanAssetKey(asset),
+        dataUrl
+      });
+    }
+    const localDispAssetStorageKey = savedLocalDispAssets.length
+      ? `${watchfaceId}:${newWatchfaceId()}` : "";
+    if (localDispAssetStorageKey) {
+      try {
+        await saveLocalDispAssetRecords(localDispAssetStorageKey, savedLocalDispAssets);
+      } catch (e) {
+        alert(t("localWatch.errQuota", { message: errorToText(e) }));
+        return false;
+      }
+    }
+    const rec = {
+      id: watchfaceId,
+      name: nm,
+      updatedAt: Date.now(),
+      config: workspace.config,
+      backgroundDataUrl: bgUrl,
+      backgroundAssetKey: bgUrl ? lanAssetKey(workspace.backgroundImage) : 0,
+      backgroundName: workspace.backgroundName,
+      backgroundSourceLabel: workspace.backgroundSourceLabel,
+      appPreviewDataUrl: appPreviewUrl,
+      appPreviewAssetKey: appPreviewUrl ? lanAssetKey(workspace.appPreviewImage) : 0,
+      appPreviewName: workspace.appPreviewName,
+      appPreviewSourceLabel: workspace.appPreviewSourceLabel,
+      localDispAssets: savedLocalDispAssets.map(({ dataUrl, ...meta }) => meta),
+      localDispAssetStorageKey,
+      width: workspace.width,
+      height: workspace.height,
+      zoom: workspace.zoom,
+      previewOverrides: workspace.previewOverrides,
+      templateActiveClockId: workspace.templateActiveClockId,
+      deviceClockIds: workspace.deviceClockIds,
+      deviceUploadStates: workspace.deviceUploadStates,
+      lanActionRevisions: workspace.lanActionRevisions,
+      unboundLegacyClockId: workspace.unboundLegacyClockId
     };
     try {
+      if (watchfaceId !== activeLocalWatchfaceId) {
+        if (localDispAssetStorageKey) {
+          void deleteLocalDispAssetRecords(localDispAssetStorageKey).catch(() => {});
+        }
+        return false;
+      }
       upsert(rec);
-      workspaceBaselineSig = getLanDirtySnapshot();
+      if (existing?.localDispAssetStorageKey
+        && existing.localDispAssetStorageKey !== localDispAssetStorageKey) {
+        void deleteLocalDispAssetRecords(existing.localDispAssetStorageKey).catch(() => {});
+      }
+      workspaceBaselineSig = savedSig;
       if (String(existing?.name || "") !== nm) refreshLocalWatchfaceListUi();
+      return true;
     } catch (e) {
+      if (localDispAssetStorageKey) {
+        void deleteLocalDispAssetRecords(localDispAssetStorageKey).catch(() => {});
+      }
       alert(t("localWatch.errQuota", { message: errorToText(e) }));
+      return false;
     }
   }
 
@@ -4385,15 +5185,18 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
     const id = newWatchfaceId();
     activeLocalWatchfaceId = id;
+    activeDeviceClockIds = {};
+    activeDeviceUploadStates = {};
+    activeUnboundLegacyClockId = 0;
     state.config.ClockId = 0;
     state.config.NameCn = nm;
     state.config.NameEn = nm;
     dom.txtClockTitle.textContent = nm;
     refreshToolbarClockIdUi();
     rebuildItemEditor();
+    resetLanActionBaselines();
     await flushPersistActiveWorkspace();
     setLastActiveId(id);
-    captureLanBaseline();
     syncWorkspaceBaseline();
     refreshLocalWatchfaceListUi();
     fontStore.log(t("localWatch.savedAs", { name: nm }));
@@ -4465,7 +5268,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       );
       namingPromptDismissed = false;
       syncWorkspaceBaseline();
-      captureLanBaseline();
+      resetLanActionBaselines();
     }
 
     refreshLocalWatchfaceListUi();
@@ -4503,10 +5306,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   async function ensureWorkspaceHandledBeforeSwitch(context) {
     window.clearTimeout(namingDebounceTimer);
+    window.clearTimeout(autosaveTimer);
+    await persistQueue;
     if (!isWorkspaceDirtyVsBaseline()) return true;
     if (activeLocalWatchfaceId) {
-      await flushPersistActiveWorkspace();
-      return true;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        window.clearTimeout(autosaveTimer);
+        if (await flushPersistActiveWorkspace() !== true) return false;
+        if (!isWorkspaceDirtyVsBaseline()) return true;
+      }
+      return false;
     }
     const r = await openLocalSaveNamedDialog({ mode: "blocking", context });
     if (r.action === "cancel") return false;
@@ -4840,6 +5649,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         rows.length === 0 ? t("localWatch.listEmpty") : t("localWatch.listHint");
     }
     ul.innerHTML = "";
+    const deviceId = resolveClockBindingDeviceId();
     for (const row of rows) {
       const li = document.createElement("li");
       if (row.id === activeLocalWatchfaceId) li.classList.add("active");
@@ -4848,7 +5658,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       const title = document.createElement("span");
       title.className = "template-id";
       title.textContent = row.name || row.id;
-      main.append(title);
+      title.title = title.textContent;
+      const clockIdOnRecord = getDeviceClockId(
+        normalizeDeviceClockBindings(row, deviceId), deviceId
+      );
+      const status = localWatchfaceStatus(deviceId, clockIdOnRecord);
+      const badge = document.createElement("span");
+      badge.className = `local-watch-status local-watch-status--${status.key}`;
+      badge.textContent = t(`localWatch.status.${status.key}`);
+      badge.title = t(`localWatch.statusTip.${status.tip}`);
+      main.append(title, badge);
       main.addEventListener("click", () => {
         void loadLocalWatchfaceById(row.id);
       });
@@ -4864,7 +5683,6 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         void exportLocalWatchfaceById(row.id);
       });
       actions.appendChild(exp);
-      const clockIdOnRecord = toNum(row.config?.ClockId, 0);
       if (clockIdOnRecord > 0) {
         const dup = document.createElement("button");
         dup.type = "button";
@@ -4893,7 +5711,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   async function restoreWorkspaceFromRecord(rec) {
-    applyConfig(rec.config, t("localWatch.loaded", { name: rec.name }));
+    const deviceId = resolveClockBindingDeviceId();
+    activeDeviceClockIds = normalizeDeviceClockBindings(rec, deviceId);
+    activeDeviceUploadStates = normalizeDeviceUploadStates(rec);
+    activeUnboundLegacyClockId = getUnboundLegacyClockId(rec, activeDeviceClockIds);
+    const restoredConfig = JSON.parse(JSON.stringify(rec.config || {}));
+    restoredConfig.ClockId = getDeviceClockId(activeDeviceClockIds, deviceId);
+    applyConfig(restoredConfig, t("localWatch.loaded", { name: rec.name }));
     let packId = resolveTemplate29PackClockId(state.config);
     if (packId <= 0 && rec.templateActiveClockId != null) {
       const fid = toNum(rec.templateActiveClockId, 0);
@@ -4917,6 +5741,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
           const img = new Image();
           img.onload = () => {
             clearBackgroundObjectUrl();
+            restoreLanAssetKey(img, rec.backgroundAssetKey);
             state.backgroundImage = img;
             state.backgroundName = rec.backgroundName || "";
             state.backgroundSourceLabel = rec.backgroundSourceLabel || "";
@@ -4944,7 +5769,14 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         await new Promise((resolve, reject) => {
           const img = new Image();
           img.onload = () => {
+            const dimensions = validateAppPreviewImage(img);
+            if (!dimensions.ok) {
+              dom.inputAppPreviewFile.value = "";
+              alert(t("lan.upload.previewDimensions", dimensions));
+              return;
+            }
             clearAppPreviewObjectUrl();
+            restoreLanAssetKey(img, rec.appPreviewAssetKey);
             state.appPreviewImage = img;
             state.appPreviewName = rec.appPreviewName || "";
             state.appPreviewSourceLabel = rec.appPreviewSourceLabel || "";
@@ -5000,15 +5832,57 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       }
     }
 
+    let savedLocalDispAssets = Array.isArray(rec.localDispAssets) ? rec.localDispAssets : [];
+    if (rec.localDispAssetStorageKey) {
+      try {
+        savedLocalDispAssets = await loadLocalDispAssetRecords(rec.localDispAssetStorageKey);
+      } catch (e) {
+        fontStore.log(errorToText(e));
+        savedLocalDispAssets = [];
+      }
+    }
+    for (const saved of savedLocalDispAssets) {
+      if (typeof saved?.dataUrl !== "string" || !saved.dataUrl.startsWith("data:")) continue;
+      const byId = saved.itemId
+        ? state.config.ItemList.findIndex((item) => item.item_id === saved.itemId) : -1;
+      const index = byId >= 0 ? byId : toNum(saved.index, -1);
+      const item = state.config.ItemList[index];
+      if (!item || !isTemplateImageItem(item)) continue;
+      try {
+        const blob = await (await fetch(saved.dataUrl)).blob();
+        const file = new File([blob], String(saved.name || item.image_addr || "item.bin"),
+          { type: String(saved.mimeType || blob.type || "application/octet-stream") });
+        const asset = await loadLocalAssetFromFile(file);
+        restoreLanAssetKey(asset, saved.assetKey);
+        localDispPersistDataUrls.set(asset, saved.dataUrl);
+        setLocalDispAsset(item, asset);
+      } catch (e) {
+        fontStore.log(errorToText(e));
+      }
+    }
+
     rebuildItemEditor();
     renderWatchface();
     applyCanvasZoom();
-    captureLanBaseline();
+    restoreLanActionRevisions(rec);
     syncWorkspaceBaseline();
   }
 
+  async function selectLocalWatchfaceOnDevice(clockId) {
+    const id = toNum(clockId, 0);
+    if (id <= 0 || !hasLanDeviceHttpTarget()) return false;
+    try {
+      await divoomJson("Channel/SetClockSelectId", { ClockId: id });
+      fontStore.log(t("lan.success.setClockSelectId", { id }));
+      return true;
+    } catch (e) {
+      fontStore.log(errorToText(e));
+      return false;
+    }
+  }
+
   async function loadLocalWatchfaceById(id) {
-    if (!id) return;
+    if (!id || lanSyncBusy || lanShareBusy) return;
     const ok = await ensureWorkspaceHandledBeforeSwitch("pick_other");
     if (!ok) return;
     const rec = getWatchface(id);
@@ -5018,15 +5892,25 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     await restoreWorkspaceFromRecord(rec);
     namingPromptDismissed = true;
     refreshLocalWatchfaceListUi();
+    await selectLocalWatchfaceOnDevice(state.config?.ClockId);
   }
 
   async function deleteLocalWatchface(id) {
     if (!id) return;
     if (!confirm(t("localWatch.confirmDelete"))) return;
+    if (activeLocalWatchfaceId === id) window.clearTimeout(autosaveTimer);
+    await persistQueue;
+    const rec = getWatchface(id);
     removeWatchface(id);
+    if (rec?.localDispAssetStorageKey) {
+      void deleteLocalDispAssetRecords(rec.localDispAssetStorageKey).catch(() => {});
+    }
     if (getLastActiveId() === id) setLastActiveId("");
     if (activeLocalWatchfaceId === id) {
       activeLocalWatchfaceId = "";
+      activeDeviceClockIds = {};
+      activeDeviceUploadStates = {};
+      activeUnboundLegacyClockId = 0;
       templateState.activeClockId = null;
       refreshTemplateListUi();
       clearBackgroundObjectUrl();
@@ -5079,24 +5963,58 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     newConfig.NameCn = nm;
     newConfig.NameEn = nm;
 
+    let sourceLocalDispAssets;
+    try {
+      sourceLocalDispAssets = src.localDispAssetStorageKey
+        ? await loadLocalDispAssetRecords(src.localDispAssetStorageKey)
+        : (Array.isArray(src.localDispAssets) ? src.localDispAssets : []);
+    } catch (e) {
+      alert(t("localWatch.errQuota", { message: errorToText(e) }));
+      return;
+    }
+    const localDispAssetStorageKey = sourceLocalDispAssets.length
+      ? `${newId}:${newWatchfaceId()}` : "";
+    if (localDispAssetStorageKey) {
+      try {
+        await saveLocalDispAssetRecords(localDispAssetStorageKey, sourceLocalDispAssets);
+      } catch (e) {
+        alert(t("localWatch.errQuota", { message: errorToText(e) }));
+        return;
+      }
+    }
+
     const rec = {
       id: newId,
       name: nm,
       updatedAt: Date.now(),
       config: newConfig,
       backgroundDataUrl: src.backgroundDataUrl || "",
+      backgroundAssetKey: src.backgroundAssetKey || 0,
       backgroundName: src.backgroundName || "",
       backgroundSourceLabel: src.backgroundSourceLabel || "",
       appPreviewDataUrl: src.appPreviewDataUrl || "",
+      appPreviewAssetKey: src.appPreviewAssetKey || 0,
       appPreviewName: src.appPreviewName || "",
       appPreviewSourceLabel: src.appPreviewSourceLabel || "",
+      localDispAssets: sourceLocalDispAssets.map(({ dataUrl, ...meta }) => meta),
+      localDispAssetStorageKey,
       width: EDITOR_CANVAS_WIDTH,
       height: EDITOR_CANVAS_HEIGHT,
       zoom: src.zoom ?? 55,
       previewOverrides: src.previewOverrides ? JSON.parse(JSON.stringify(src.previewOverrides)) : {},
-      templateActiveClockId: src.templateActiveClockId != null ? src.templateActiveClockId : null
+      templateActiveClockId: src.templateActiveClockId != null ? src.templateActiveClockId : null,
+      deviceClockIds: {},
+      deviceUploadStates: {}
     };
-    upsert(rec);
+    try {
+      upsert(rec);
+    } catch (e) {
+      if (localDispAssetStorageKey) {
+        void deleteLocalDispAssetRecords(localDispAssetStorageKey).catch(() => {});
+      }
+      alert(t("localWatch.errQuota", { message: errorToText(e) }));
+      return;
+    }
     activeLocalWatchfaceId = newId;
     setLastActiveId(newId);
     await restoreWorkspaceFromRecord(rec);
@@ -5273,6 +6191,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     if (!res.ok) {
       throw new Error(t("lan.err.http", { status: res.status, text: text.slice(0, 240) }));
     }
+    if (!data || data.ReturnCode === undefined) throw new Error(t("lan.share.invalidResponse"));
     if (data && data.ReturnCode !== undefined && Number(data.ReturnCode) !== 0) {
       throw new Error(String(data.ReturnMessage || t("lan.err.returnCode", { code: data.ReturnCode })));
     }
@@ -5297,6 +6216,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     catalogSource: "",
     savedAt: ""
   };
+  const pendingNameRequests = new Map();
+  const pendingNameAttempted = new Set();
 
   function formatPendingCacheSavedAt(isoText) {
     const raw = String(isoText || "").trim();
@@ -5469,6 +6390,47 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return null;
   }
 
+  function pendingTemplateItemName(item) {
+    const id = toNum(item?.clockId, 0);
+    const legacy = String(item?.clockName || "").trim();
+    const cn = String(item?.clockNameCn || "").trim() ||
+      (/[\u3400-\u9fff]/.test(legacy) ? legacy : "");
+    const en = englishCatalogText(item?.clockNameEn) || englishCatalogText(legacy);
+    return isUiZhCnLocale() ? (cn || en || `Clock ${id}`) : (en || `Clock ${id}`);
+  }
+
+  async function ensureSelectedPendingTemplateNames() {
+    if (!pendingTemplateState.active) return;
+    const row = getSelectedPendingClassifyRow();
+    if (!row) return;
+    const language = pickSyncLanguage(getLocaleCode());
+    const key = `${language}:${row.ClassifyId}`;
+    if (pendingNameAttempted.has(key) || pendingNameRequests.has(key)) return;
+    const needsName = (row.items || []).some((item) => {
+      const legacy = String(item.clockName || "").trim();
+      return language === "en"
+        ? !englishCatalogText(item.clockNameEn) && !englishCatalogText(legacy)
+        : !String(item.clockNameCn || "").trim() && !/[\u3400-\u9fff]/.test(legacy);
+    });
+    if (!needsName) return;
+    const request = (async () => {
+      const names = await fetchAllClockRowsInClassify(divoomStoreJson, row.ClassifyId, language);
+      const byId = new Map(names.map((item) => [Number(item.ClockId), String(item.ClockName || "").trim()]));
+      for (const item of row.items || []) {
+        const name = byId.get(Number(item.clockId));
+        if (!name) continue;
+        if (language === "en") item.clockNameEn = englishCatalogText(name);
+        else item.clockNameCn = name;
+      }
+      pendingNameAttempted.add(key);
+      if (!pendingTemplateState.classifyRows.includes(row)) return;
+      savePendingTemplateCacheNow();
+      if (getSelectedPendingClassifyRow() === row) refreshPendingTemplateListUi();
+    })().catch(() => {}).finally(() => pendingNameRequests.delete(key));
+    pendingNameRequests.set(key, request);
+    await request;
+  }
+
   function refreshPendingTemplateCategoryUi() {
     syncTemplateDomRefs();
     const rail = dom.templatePendingCategoryRail;
@@ -5490,7 +6452,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
     for (const row of pendingTemplateState.classifyRows) {
       const pendingCount = (row.items || []).filter((it) => it.status !== "installed").length;
-      const label = localizedDualName(row.ClassifyName, row.ClassifyNameEn, `Classify ${row.ClassifyId}`);
+      const catalogRow = getTemplateClassifyData()?.ClassifyList?.find(
+        (item) => Number(item.ClassifyId) === Number(row.ClassifyId)
+      );
+      const en = englishCatalogText(row.ClassifyNameEn) || englishCatalogText(catalogRow?.ClassifyNameEn);
+      const label = isUiZhCnLocale()
+        ? localizedDualName(row.ClassifyName || catalogRow?.ClassifyName, en, `Classify ${row.ClassifyId}`)
+        : (en || `Classify ${row.ClassifyId}`);
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "template-category-chip";
@@ -5503,6 +6471,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         savePendingTemplateCacheNow();
         refreshPendingTemplateCategoryUi();
         refreshPendingTemplateListUi();
+        void ensureSelectedPendingTemplateNames();
       });
       rail.appendChild(btn);
     }
@@ -5578,7 +6547,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       textWrap.className = "template-thumb-text";
       const nameSpan = document.createElement("span");
       nameSpan.className = "template-id";
-      nameSpan.textContent = item.clockName || `Clock ${id}`;
+      nameSpan.textContent = pendingTemplateItemName(item);
       const sub = document.createElement("span");
       sub.className = "template-thumb-sub";
       sub.textContent = t("template.item.file", { id });
@@ -5691,7 +6660,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     refreshPendingTemplateListUi();
     refreshTemplateSyncUi();
 
-    const title = item.clockName || t("template.item.file", { id });
+    const title = pendingTemplateItemName(item);
     openTemplateDownloadProgressDialog(t("template.pending.downloadingTitle", { name: title }));
 
     try {
@@ -5803,6 +6772,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
       if (!totalPending) {
         pendingTemplateState.classifyRows = [];
+        pendingNameAttempted.clear();
         pendingTemplateState.savedAt = "";
         pendingTemplateState.catalogSource = "";
         savePendingTemplateCacheToStorage({ classifyRows: [] });
@@ -5814,6 +6784,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       }
 
       pendingTemplateState.classifyRows = classifyRows;
+      pendingNameAttempted.clear();
       pendingTemplateState.catalogSource = String(catalogSource || "");
       pendingTemplateState.savedAt = new Date().toISOString();
       pendingTemplateState.selectedClassifyId = classifyRows[0]?.ClassifyId ?? null;
@@ -5827,6 +6798,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       }
       refreshPendingTemplateCategoryUi();
       refreshPendingTemplateListUi();
+      void ensureSelectedPendingTemplateNames();
     } catch (e) {
       pendingTemplateState.error = errorToText(e);
       const msg = t("template.pending.scanFailed", { message: pendingTemplateState.error });
@@ -5850,6 +6822,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     setTemplatePendingPanelVisible(true);
     refreshPendingTemplateCategoryUi();
     refreshPendingTemplateListUi();
+    void ensureSelectedPendingTemplateNames();
     const firstRow = getSelectedPendingClassifyRow();
     const firstItem = firstRow?.items?.find((it) => it.status !== "installed");
     if (firstItem) {
@@ -6044,7 +7017,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         fontStore.log(`font_info.cfg 写入失败: ${errorToText(e)}`);
       }
     }
-    fontStore.parseFontListLike(mergedFontInfo);
+    fontStore.parseFontListLike(mergedFontInfo, { replace: true });
     refreshFontPreviewSelect();
     rebuildItemEditor();
   }
@@ -6293,11 +7266,12 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       if (idx >= n) return merged;
       const willBundleLeaf = !!getLocalDispAsset(ed)?.objectUrl;
       if (willBundleLeaf) return merged;
-      const dev = deviceItems[idx];
+      const dev = deviceItems.find((item) =>
+        toNum(item.disp ?? item.type, -1) === toNum(ed.disp ?? ed.type, -2)) || deviceItems[idx];
       const edImg = String(merged.image_addr ?? "").trim();
       const devImg = String(dev?.image_addr ?? dev?.img_addr ?? "").trim();
       const editorLocalLeaf = edImg.length > 0 && !/^https?:\/\//i.test(edImg);
-      const deviceHosted = /^https?:\/\//i.test(devImg);
+      const deviceHosted = devImg.length > 0;
       if (editorLocalLeaf && deviceHosted) merged.image_addr = devImg;
       return merged;
     });
@@ -6310,6 +7284,25 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       throw new Error(t("lan.err.precheckEmptyItemList"));
     }
     return items;
+  }
+
+  async function remapUnavailableStateFontsForLan() {
+    const data = await divoomJson("Device/GetLocalFontList");
+    const result = remapUnavailableItemFonts(
+      state.config.ItemList,
+      Array.isArray(data?.FontList) ? data.FontList : [],
+      fontStore.getAllMetas()
+    );
+    if (!result.replacements.length) return result;
+
+    state.config.ItemList = result.items;
+    syncItemIdList();
+    rebuildItemEditor();
+    renderWatchface();
+    onLocalConfigEdited();
+    const changes = result.replacements.map((row) => `${row.from}→${row.to}`).join(", ");
+    fontStore.log(t("lan.log.fontRemapped", { changes }));
+    return result;
   }
 
   async function buildLanPatchPayloadMergedForMultipart() {
@@ -6347,7 +7340,15 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    *
    * 返回 `null` 表示该项无任何字段差异（不需要 patch）。
    */
-  function computeSingleItemPatch(editorItem, deviceItem, leafMap) {
+  function getLanBundleLeafForItem(leafMap, itemIndex) {
+    if (!(leafMap instanceof Map)) return "";
+    for (const [safeLeaf, entry] of leafMap) {
+      if (entry?.itemIndex === itemIndex) return safeLeaf;
+    }
+    return "";
+  }
+
+  function computeSingleItemPatch(editorItem, deviceItem, leafMap, itemIndex) {
     if (!editorItem) return null;
     const patch = {};
 
@@ -6367,11 +7368,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
     const edImg = String(editorItem.image_addr ?? "").trim();
     const devImg = String(deviceItem?.image_addr ?? deviceItem?.img_addr ?? "").trim();
-    const edLeaf = edImg.length > 0 && !/^https?:\/\//i.test(edImg) ? basename(edImg) : "";
-    const willBundleThisItem = !!(edLeaf && leafMap?.has?.(edLeaf));
-    if (willBundleThisItem) {
-      patch.bundle_image = edLeaf;
-      patch.image_addr = edLeaf;
+    const safeLeaf = getLanBundleLeafForItem(leafMap, itemIndex);
+    if (safeLeaf) {
+      patch.bundle_image = safeLeaf;
+      patch.image_addr = safeLeaf;
     } else {
       const editorIsHttpUrl = /^https?:\/\//i.test(edImg);
       if (editorIsHttpUrl && edImg !== devImg) {
@@ -6397,7 +7397,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
     const patches = [];
     for (let i = 0; i < editorItems.length; i++) {
-      const patch = computeSingleItemPatch(editorItems[i], deviceItems[i], leafMap);
+      const patch = computeSingleItemPatch(editorItems[i], deviceItems[i], leafMap, i);
       if (patch) patches.push({ index: i, patch });
     }
     return { patches, lengthMismatch: false };
@@ -6418,42 +7418,32 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     };
   }
 
-  function renderDialBackgroundJpegBlobAtQuality(quality) {
+  async function renderDialBackgroundJpegBlobAtQuality(quality) {
     const w = state.width || EDITOR_CANVAS_WIDTH;
     const h = state.height || EDITOR_CANVAS_HEIGHT;
-    return new Promise((resolve, reject) => {
-      const c = document.createElement("canvas");
-      c.width = w;
-      c.height = h;
-      const ctx = c.getContext("2d");
-      const img = state.backgroundImage;
-      if (img && img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, 0, 0, w, h);
-      } else {
-        ctx.fillStyle = "#141c2b";
-        ctx.fillRect(0, 0, w, h);
-      }
-      c.toBlob((b) => {
-        if (b) resolve(b);
-        else reject(new Error("JPEG blob failed"));
-      }, "image/jpeg", quality);
-    });
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    const img = state.backgroundImage;
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, 0, 0, w, h);
+    } else {
+      ctx.fillStyle = "#141c2b";
+      ctx.fillRect(0, 0, w, h);
+    }
+    return encodeCanvasForAstroToo(c, quality);
   }
 
-  function renderDialBackgroundJpegBlob() {
-    return renderDialBackgroundJpegBlobAtQuality(0.88);
-  }
-
-  /** 固件常见限制约 512000 字节（见 mcp-divoom-lan 文档）；超限时逐步降低 JPEG 质量。 */
+  /** 固件要求 baseline YCbCr 4:2:0 JPEG 且严格小于 500KiB；超限时逐步降低质量。 */
   async function renderDialBackgroundJpegBlobForLanUpload() {
-    const maxBytes = 512000;
-    let quality = 0.88;
+    let quality = 82;
     for (let i = 0; i < 12; i++) {
       const blob = await renderDialBackgroundJpegBlobAtQuality(quality);
-      if (blob.size <= maxBytes) return blob;
-      quality = Math.max(0.32, quality * 0.86);
+      if (blob.size < DEVICE_JPEG_MAX_BYTES) return blob;
+      quality = Math.max(24, Math.round(quality * 0.84));
     }
-    return renderDialBackgroundJpegBlobAtQuality(0.3);
+    throw new Error(t("lan.err.invalidDialImage"));
   }
 
   /**
@@ -6470,40 +7460,35 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    */
   function collectLanBundlableDispAssetLeaves() {
     const byLeaf = new Map();
-    for (const item of state.config.ItemList || []) {
+    (state.config.ItemList || []).forEach((item, itemIndex) => {
       const addr = String(item?.image_addr || "").trim();
-      if (!addr) continue;
-      if (/^https?:\/\//i.test(addr)) continue;
+      if (!addr || /^https?:\/\//i.test(addr)) return;
       const leaf = basename(addr);
-      if (!leaf) continue;
-      if (/^clock_bg\.(jpe?g|webp)$/i.test(leaf)) continue;
+      if (!leaf || /^clock_bg\.(jpe?g|webp)$/i.test(leaf)) return;
       const asset = getLocalDispAsset(item);
-      if (!asset?.objectUrl) continue;
-      if (!byLeaf.has(leaf)) byLeaf.set(leaf, asset);
-    }
+      if (!asset?.objectUrl) return;
+      byLeaf.set(`element_${itemIndex}.bin`, { asset, itemIndex, sourceLeaf: leaf });
+    });
     return byLeaf;
   }
 
   /**
    * PATCH 语义专用的元素图叶子收集器。与 CREATE 不同的是：设备此时已托管该 dial 的全部既有资源
    * （模板预载的 `.bin`/`.gif` 已经被设备分配 image_id，URL 也已落 cloud），所以**只对用户在编辑器里
-   * 显式新选的资源**（`asset.fromLocalPick === true`）触发 tar.gz 上传；模板预载（`fromLocalPick=false`）
+   * 显式新选的资源**（`asset.fromLocalPick === true`）触发 USTAR 上传；模板预载（`fromLocalPick=false`）
    * 跳过——避免无意义地把同一文件再传一遍并改写设备 img_addr 的 cloud URL。
    */
   function collectLanUserPickedDispAssetLeaves() {
     const byLeaf = new Map();
-    for (const item of state.config.ItemList || []) {
+    (state.config.ItemList || []).forEach((item, itemIndex) => {
       const addr = String(item?.image_addr || "").trim();
-      if (!addr) continue;
-      if (/^https?:\/\//i.test(addr)) continue;
+      if (!addr || /^https?:\/\//i.test(addr)) return;
       const leaf = basename(addr);
-      if (!leaf) continue;
-      if (/^clock_bg\.(jpe?g|webp)$/i.test(leaf)) continue;
+      if (!leaf || /^clock_bg\.(jpe?g|webp)$/i.test(leaf)) return;
       const asset = getLocalDispAsset(item);
-      if (!asset?.objectUrl) continue;
-      if (asset.fromLocalPick !== true) continue;
-      if (!byLeaf.has(leaf)) byLeaf.set(leaf, asset);
-    }
+      if (!asset?.objectUrl || asset.fromLocalPick !== true) return;
+      byLeaf.set(`element_${itemIndex}.bin`, { asset, itemIndex, sourceLeaf: leaf });
+    });
     return byLeaf;
   }
 
@@ -6563,6 +7548,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    */
   function isBundleSlotSupportedBytes(u8) {
     if (!u8 || u8.length < 12) return false;
+    if (isDivoomJpegGifBytes(u8)) return true;
     if (u8[0] === 0xff && u8[1] === 0xd8) return true;
     if (
       u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46 &&
@@ -6579,43 +7565,49 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return false;
   }
 
-  /**
-   * 兜底：当字节流既不是 JPEG/WEBP 也不是 PNG（例如 BMP、TIFF、ICO 等）时，转码到 JPEG。
-   * 透明像素以黑色填充背景（动画 GIF 会丢失帧，仅保留首帧）。
-   */
+  /** 把元素图片转为设备稳定支持的 baseline YCbCr 4:2:0 JPEG。 */
   async function encodeBytesToJpegForBundle(srcBytes, mimeHint) {
     const type = (mimeHint && mimeHint.startsWith("image/")) ? mimeHint : "image/png";
     const blob = new Blob([srcBytes], { type });
     const url = URL.createObjectURL(blob);
     try {
       const img = await loadImageByObjectUrl(url);
-      const w = Math.max(1, img.naturalWidth || img.width || 1);
-      const h = Math.max(1, img.naturalHeight || img.height || 1);
+      const sourceW = Math.max(1, img.naturalWidth || img.width || 1);
+      const sourceH = Math.max(1, img.naturalHeight || img.height || 1);
+      const scale = Math.min(1, 1024 / Math.max(sourceW, sourceH));
+      const w = Math.max(1, Math.round(sourceW * scale));
+      const h = Math.max(1, Math.round(sourceH * scale));
       const c = document.createElement("canvas");
       c.width = w;
       c.height = h;
       const ctx = c.getContext("2d");
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      const out = await new Promise((resolve, reject) => {
-        c.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/jpeg", 0.9);
-      });
-      const buf = await out.arrayBuffer();
-      return new Uint8Array(buf);
+      ctx.drawImage(img, 0, 0, sourceW, sourceH, 0, 0, w, h);
+      let quality = 86;
+      for (let i = 0; i < 12; i++) {
+        const blob = await encodeCanvasForAstroToo(c, quality);
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        if (bytes.length > 0 && bytes.length < DEVICE_JPEG_MAX_BYTES) {
+          inspectDeviceJpeg(bytes);
+          return bytes;
+        }
+        quality = Math.max(24, Math.round(quality * 0.84));
+      }
+      throw new Error("element JPEG exceeds device limit");
     } finally {
       try { URL.revokeObjectURL(url); } catch { /* ignore */ }
     }
   }
 
   /**
-   * 让 `clock_bg.tar.gz` 内每张元素图都被设备接受。固件 `wf_validate_bundle_slot_image_file`
+   * 让 `clock_assets.tar` 内每张元素图都被设备接受。固件 `wf_validate_bundle_slot_image_file`
    * 元素槽位允许 JPEG/WEBP/PNG（背景图另有 dial-bg 校验函数限定为 JPEG/WEBP）。
-   * - JPEG/WEBP/PNG：原字节直通，保留原叶子名（与 ItemList.image_addr 对齐）。
-   * - 其它格式（如 BMP/TIFF/ICO/GIF 等）才走 canvas 转码到 JPEG 兜底。
+   * JPEG 一律重编码，避免 progressive/4:4:4 等固件解码器不支持的编码；WEBP/PNG/DIVM 原字节直通。
    */
   async function ensureBundleSlotBytesAreSupported(srcBytes, asset, leaf) {
-    if (isBundleSlotSupportedBytes(srcBytes)) return srcBytes;
+    const isJpeg = srcBytes?.[0] === 0xff && srcBytes?.[1] === 0xd8;
+    if (!isJpeg && isBundleSlotSupportedBytes(srcBytes)) return srcBytes;
     try {
       const transcoded = await encodeBytesToJpegForBundle(srcBytes, asset?.mimeType || "");
       if (isLanVerboseDebug()) {
@@ -6629,19 +7621,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     }
   }
 
-  async function gzipUint8Array(u8) {
-    if (typeof CompressionStream === "undefined") {
-      throw new Error(t("lan.err.bundleCompressionUnsupported"));
-    }
-    const blob = new Blob([u8]);
-    const cs = new CompressionStream("gzip");
-    return new Response(blob.stream().pipeThrough(cs)).blob();
-  }
-
   /**
    * 设备 `/create_local_clock`、`/patch_local_clock` multipart 第二段约定（与固件侧一致）：
    * - `DialAssets: "image"`：单文件 `clock_bg.jpg`（画布 JPEG；无用户底图时为占位纯色画布）。
-   * - `DialAssets: "bundle"`：`clock_bg.tar.gz`，内含 `clock_bg.jpg` + `ItemList.image_addr` 需上传的叶子（USTAR + gzip）。
+   * - `DialAssets: "bundle"`：`clock_assets.tar`，内含 `clock_bg.jpg` + `ItemList.image_addr` 需上传的叶子（USTAR）。
    * - 仅「用户本机选图」(`fromLocalPick`) 的元素打入 tar；模板预载 `.bin` 由设备按内置资源解析，避免无谓 bundle。
    */
   function logLanMultipartScenario(tag, dialPack, leafMap) {
@@ -6688,7 +7671,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   /**
-   * 决定 multipart 第二段：单 JPEG（`DialAssets:image`）或 tar.gz（`DialAssets:bundle`）。
+   * 有元素图片时把底图和元素一次性打进 USTAR。设备收到 Create/Patch 后先释放旧表盘资源，
+   * 再解包并验证元素，避免 `/upload_local_asset` 在等待页之前解码而 OOM。
    *
    * @param {Map<string,object>|null} externalLeafMap
    *   非 null 时使用调用方提供的叶子集（PATCH 路径需要按 `fromLocalPick` 过滤，使用
@@ -6697,46 +7681,64 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    */
   async function resolveLanMultipartDialSecondPart(externalLeafMap = null) {
     const leafMap = externalLeafMap !== null ? externalLeafMap : collectLanBundlableDispAssetLeaves();
-    if (!leafMap.size) {
-      const blob = await renderDialBackgroundJpegBlobForLanUpload();
-      const pack = {
+    const bgBlob = await renderDialBackgroundJpegBlobForLanUpload();
+    if (leafMap.size === 0) {
+      return {
         dialAssets: "image",
-        blob,
+        blob: bgBlob,
         multipartFilename: LAN_MULTIPART_DIAL_FILENAME,
-        leafSet: new Set()
+        leafSet: new Set(),
+        leafByItemIndex: new Map()
       };
-      logLanMultipartScenario("multipart", pack, leafMap);
-      return pack;
     }
-    const clockBlob = await renderDialBackgroundJpegBlobForLanUpload();
-    const clockBuf = new Uint8Array(await clockBlob.arrayBuffer());
-    const files = [{ name: "clock_bg.jpg", data: clockBuf }];
-    for (const [leaf, asset] of leafMap) {
+    const files = [{ name: "clock_bg.jpg", data: new Uint8Array(await bgBlob.arrayBuffer()) }];
+    for (const [leaf, entry] of leafMap) {
+      const asset = entry.asset;
       const res = await fetch(asset.objectUrl);
       if (!res.ok) throw new Error(t("lan.err.bundleAssetFetchFailed", { name: leaf }));
-      const raw = new Uint8Array(await res.arrayBuffer());
-      const safeBytes = await ensureBundleSlotBytesAreSupported(raw, asset, leaf);
-      files.push({ name: leaf, data: safeBytes });
+      const bytes = await ensureBundleSlotBytesAreSupported(
+        new Uint8Array(await res.arrayBuffer()), asset, leaf
+      );
+      files.push({ name: leaf, data: bytes });
     }
     const tarBytes = buildTarArchiveBytes(files);
-    const gzBlob = await gzipUint8Array(tarBytes);
-    if (isLanVerboseDebug()) {
-      fontStore.log(
-        t("lan.log.bundleMultipart", {
-          leaves: leafMap.size,
-          tarBytes: tarBytes.length,
-          gzBytes: gzBlob.size
-        })
-      );
-    }
-    const pack = {
+    return {
       dialAssets: "bundle",
-      blob: gzBlob,
+      blob: new Blob([tarBytes], { type: "application/x-tar" }),
       multipartFilename: LAN_MULTIPART_BUNDLE_FILENAME,
-      leafSet: new Set(leafMap.keys())
+      leafSet: new Set(leafMap.keys()),
+      leafByItemIndex: new Map([...leafMap].map(([leaf, entry]) => [entry.itemIndex, leaf]))
     };
-    logLanMultipartScenario("multipart", pack, leafMap);
-    return pack;
+  }
+
+  async function bindLanSequentialAssets(metadata) {
+    const bound = JSON.parse(JSON.stringify(metadata));
+    const leaves = collectLanBundlableDispAssetLeaves();
+    const rows = bound.ItemList
+      ? bound.ItemList.map((row, index) => ({ row, index }))
+      : (bound.ItemPatchList || []).map((entry) => ({ row: entry.patch, index: entry.index }));
+    for (const { row, index } of rows) {
+      const leaf = row.bundle_image || basename(String(row.image_addr || ""));
+      const asset = [...leaves.values()].find((entry) => entry.itemIndex === index)?.asset;
+      if (!asset) {
+        if (row.bundle_image) throw new Error(t("lan.err.bundleAssetFetchFailed", { name: leaf }));
+        continue;
+      }
+      const res = await fetch(asset.objectUrl);
+      if (!res.ok) throw new Error(t("lan.err.bundleAssetFetchFailed", { name: leaf }));
+      const bytes = await ensureBundleSlotBytesAreSupported(new Uint8Array(await res.arrayBuffer()), asset, leaf);
+      // Each reference is consumed once by firmware; upload separately for each slot.
+      const data = await postLanMultipartToDevice(LAN_MULTIPART_ENDPOINT.asset,
+        { Command: "Device/UploadLocalAsset" }, new Blob([bytes]), "asset.bin");
+      if (!data || Number(data.ReturnCode) !== 0 || !/^local:\/\/[A-Za-z0-9_.-]+$/.test(data.FileId || "")) {
+        throw new Error(t("lan.share.invalidResponse"));
+      }
+      row.image_addr = data.FileId;
+      delete row.bundle_image;
+    }
+    // Full replacements already carry the staged references; extra binding patches are redundant.
+    if (bound.ItemList) delete bound.ItemPatchList;
+    return bound;
   }
 
   /**
@@ -6747,18 +7749,22 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    *  - 否则 → 清空为 `""`，避免设备触发 `bundle element file missing`
    * 这种"模板预载叶子在本机不可用"的情况会在创建/整表替换路径里出现：模板原本引用了
    * `(image_id+1).bin` 之类资源，但本仓库 `public/template/29/...` 没有对应文件，
-   * 编辑器拿不到字节就不会塞进 tar.gz。
+   * 编辑器拿不到字节就不会塞进 USTAR。
    */
-  function sanitizeItemListImageAddrForLanUpload(items, packedLeafSet) {
+  function sanitizeItemListImageAddrForLanUpload(
+    items, packedLeafSet, trustedRefs = new Set(), leafByItemIndex = new Map()
+  ) {
     const stripped = [];
     const sanitized = (items || []).map((raw, index) => {
       const item = { ...raw };
       const addr = String(item.image_addr || "").trim();
-      if (!addr) return item;
+      if (!addr || trustedRefs.has(addr)) return item;
       if (/^https?:\/\//i.test(addr)) return item;
       const leaf = basename(addr);
-      if (leaf && packedLeafSet && packedLeafSet.has(leaf)) {
-        item.image_addr = leaf;
+      const safeLeaf = leafByItemIndex.get(index);
+      if (safeLeaf && packedLeafSet && packedLeafSet.has(safeLeaf)) {
+        item.image_addr = safeLeaf;
+        item.bundle_image = safeLeaf;
         return item;
       }
       if (leaf) stripped.push({ index, leaf });
@@ -6892,12 +7898,14 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
   const LAN_MULTIPART_ENDPOINT = Object.freeze({
     create: "/create_local_clock",
-    patch: "/patch_local_clock"
+    patch: "/patch_local_clock",
+    asset: "/upload_local_asset"
   });
 
   const LAN_MULTIPART_COMMAND_BY_PATH = Object.freeze({
     [LAN_MULTIPART_ENDPOINT.create]: "Device/CreateLocalClock",
-    [LAN_MULTIPART_ENDPOINT.patch]: "Device/PatchLocalClockInfo"
+    [LAN_MULTIPART_ENDPOINT.patch]: "Device/PatchLocalClockInfo",
+    [LAN_MULTIPART_ENDPOINT.asset]: "Device/UploadLocalAsset"
   });
 
   /**
@@ -6915,11 +7923,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    */
   const LAN_MULTIPART_BOUNDARY_MCP = Object.freeze({
     [LAN_MULTIPART_ENDPOINT.create]: "----DivoomMcpCreateClockBoundary7YA4YWxkTrZu0gW",
-    [LAN_MULTIPART_ENDPOINT.patch]: "----DivoomMcpPatchClockBoundary7YA4YWxkTrZu0gW"
+    [LAN_MULTIPART_ENDPOINT.patch]: "----DivoomMcpPatchClockBoundary7YA4YWxkTrZu0gW",
+    [LAN_MULTIPART_ENDPOINT.asset]: "----DivoomLocalAssetBoundary7YA4YWxkTrZu0gW"
   });
 
   async function buildLanMultipartWireForDevice(jsonStr, imageBlob, pathSuffix, dialFileName) {
-    assertNonEmptyDialImageBlob(imageBlob);
+    if (pathSuffix === LAN_MULTIPART_ENDPOINT.asset) {
+      if (!imageBlob || imageBlob.size <= 0 || imageBlob.size >= 512000) {
+        throw new Error(t("lan.err.invalidDialImage"));
+      }
+    } else assertNonEmptyDialImageBlob(imageBlob);
     const boundary = LAN_MULTIPART_BOUNDARY_MCP[pathSuffix];
     if (!boundary) {
       throw new Error(t("lan.err.multipartUnknownPath", { path: String(pathSuffix) }));
@@ -6929,6 +7942,21 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     const img = new Uint8Array(await imageBlob.arrayBuffer());
     if (img.length !== imageBlob.size) {
       throw new Error(t("lan.err.invalidDialImage"));
+    }
+    if (pathSuffix === LAN_MULTIPART_ENDPOINT.create || pathSuffix === LAN_MULTIPART_ENDPOINT.patch) {
+      const meta = JSON.parse(jsonStr);
+      if (meta.DialAssets === "bundle") {
+        if (img.length < 512 || String.fromCharCode(...img.slice(257, 262)) !== "ustar") {
+          throw new Error("watchface bundle must be USTAR");
+        }
+      } else {
+        const profile = inspectDeviceJpeg(img);
+        if (profile.width !== EDITOR_CANVAS_WIDTH || profile.height !== EDITOR_CANVAS_HEIGHT) {
+          throw new Error(`JPEG must be ${EDITOR_CANVAS_WIDTH}x${EDITOR_CANVAS_HEIGHT}, got ${profile.width}x${profile.height}`);
+        }
+      }
+    } else if (pathSuffix === LAN_MULTIPART_ENDPOINT.asset && img[0] === 0xff && img[1] === 0xd8) {
+      inspectDeviceJpeg(img);
     }
     const crlf = "\r\n";
     const filePartName = String(Date.now()).replace(/"/g, "");
@@ -7079,6 +8107,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       logLanAutoDebug(entry, "http");
       throw new Error(t("lan.err.http", { status: res.status, text: text.slice(0, 240) }));
     }
+    if (!data || data.ReturnCode === undefined) throw new Error(t("lan.share.invalidResponse"));
     if (data && data.ReturnCode !== undefined && Number(data.ReturnCode) !== 0) {
       logLanAutoDebug(entry, "device");
       throw new Error(String(data.ReturnMessage || t("lan.err.returnCode", { code: data.ReturnCode })));
@@ -7087,11 +8116,13 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   async function divoomCreateMultipart(metadata, imageBlob, dialFileName = LAN_MULTIPART_DIAL_FILENAME) {
-    return postLanMultipartToDevice(LAN_MULTIPART_ENDPOINT.create, metadata, imageBlob, dialFileName);
+    const bound = metadata.DialAssets === "bundle" ? metadata : await bindLanSequentialAssets(metadata);
+    return postLanMultipartToDevice(LAN_MULTIPART_ENDPOINT.create, bound, imageBlob, dialFileName);
   }
 
   async function divoomPatchLocalClockMultipart(metadata, imageBlob, dialFileName = LAN_MULTIPART_DIAL_FILENAME) {
-    return postLanMultipartToDevice(LAN_MULTIPART_ENDPOINT.patch, metadata, imageBlob, dialFileName);
+    const bound = metadata.DialAssets === "bundle" ? metadata : await bindLanSequentialAssets(metadata);
+    return postLanMultipartToDevice(LAN_MULTIPART_ENDPOINT.patch, bound, imageBlob, dialFileName);
   }
 
   function extractLanResponseClockId(data) {
@@ -7139,7 +8170,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
   }
 
   function openLanCreateConfirmDialogForDeviceCreate() {
-    if (toNum(state.config.ClockId, 0) > 0) return;
+    if (toNum(state.config.ClockId, 0) > 0 || !hasLanDeviceChanges()) return;
     if (!dom.lanCreateDialog?.showModal) {
       alert(t("lan.dialog.missing"));
       return;
@@ -7195,38 +8226,50 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
    * 仅在编辑器侧增删了项（长度不一致）时回退整表替换。
    *
    * 上传第二段（`/patch_local_clock` multipart）的规则：
-   * 1) 任何元素 patch 含 `bundle_image` → 必须 `DialAssets:bundle`，第二段为 tar.gz。
-   * 2) 否则用户改了 dial 底图 → `DialAssets:image`，第二段为单张 JPEG。
+   * 1) 元素 patch 的内部 bundle_image 标记先转换成逐文件上传返回的 local:// 引用。
+   * 2) 图片修改走 `DialAssets:image`，第二段为单张底图 JPEG。
    * 3) 否则纯字段调整（字号/坐标/颜色等）走 `/divoom_api` JSON，无第二段。
    *    （对应固件 `else { divoom_watchface_local_http_patch_local_clock_with_upload(json, NULL, 0) }` 分支。）
    */
-  async function onLanApplyWatchfaceConfigClick() {
+  async function onLanApplyWatchfaceConfigClick({ forShare = false } = {}) {
     if (toNum(state.config.ClockId, 0) <= 0) return;
     if (!state.config.ItemList.length) {
       alert(t("lan.err.emptyItemList"));
       return;
     }
-    const btn = dom.btnLanApplyWatchfaceConfig;
-    if (btn) btn.disabled = true;
+    if (!hasLanDeviceChanges()) return true;
+    if (lanSyncBusy || (lanShareBusy && !forShare)) return false;
+    lanSyncBusy = true;
+    refreshLanActionButtons();
+    const controls = [dom.selectLanDevice, dom.btnRefreshLanDevices, dom.mainLayout,
+      dom.appModeLocal, dom.appModeTemplate];
+    const inertBefore = controls.map((el) => el?.inert);
+    controls.forEach((el) => { if (el) el.inert = true; });
     try {
       fontStore.log(t("lan.busy"));
 
+      await remapUnavailableStateFontsForLan();
       syncItemIdList();
       const clockId = toNum(state.config.ClockId, 0);
       const clockSel = clockId > 0 ? { ClockId: clockId } : { UseCurrentDisplayClock: true };
       const deviceItems = await fetchLanEditableClockItemsOrThrow(clockSel);
       const userPickedLeafMap = collectLanUserPickedDispAssetLeaves();
       const cmp = computeLanItemPatchList(state.config.ItemList, deviceItems, userPickedLeafMap);
-      const bgDirty = isLanBackgroundDirtyAgainstBaseline();
+      // A device does not expose a background content hash.  Always upload
+      // the current background so same-name replacements and device switches
+      // cannot be reported as a false successful no-op.
+      const bgDirty = true;
       const hasBundleLeaf = cmp.patches.some((entry) => !!entry.patch?.bundle_image);
 
       if (cmp.lengthMismatch) {
         const merged = mergeItemListImageAddrForLanPatch(state.config.ItemList, deviceItems);
-        const fullReplaceLeafMap = collectLanBundlableDispAssetLeaves();
         const dialPack = await resolveLanMultipartDialSecondPart();
         assertNonEmptyDialImageBlob(dialPack.blob);
         const lanFullItems = itemListWithLanItemIds(merged);
-        const sanitizedFull = sanitizeItemListImageAddrForLanUpload(lanFullItems, dialPack.leafSet);
+        const trustedRefs = new Set(deviceItems.map((item) => String(item.image_addr || item.img_addr || "")));
+        const sanitizedFull = sanitizeItemListImageAddrForLanUpload(
+          lanFullItems, dialPack.leafSet, trustedRefs, dialPack.leafByItemIndex
+        );
         if (sanitizedFull.stripped.length) {
           fontStore.log(
             t("lan.log.createImageAddrStripped", {
@@ -7244,11 +8287,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         };
         const itemPatchListForBinding = [];
         sanitizedFull.items.forEach((it, idx) => {
-          const addr = String(it?.image_addr || "").trim();
-          if (!addr || /^https?:\/\//i.test(addr)) return;
-          const leaf = basename(addr);
-          if (!leaf || !fullReplaceLeafMap.has(leaf)) return;
-          itemPatchListForBinding.push({ index: idx, patch: { bundle_image: leaf } });
+          const safeLeaf = dialPack.leafByItemIndex.get(idx);
+          if (!safeLeaf) return;
+          itemPatchListForBinding.push({ index: idx, patch: { bundle_image: safeLeaf } });
         });
         if (itemPatchListForBinding.length > 0) {
           meta.ItemPatchList = itemPatchListForBinding;
@@ -7257,9 +8298,10 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         await divoomPatchLocalClockMultipart(meta, dialPack.blob, dialPack.multipartFilename);
       } else if (cmp.patches.length === 0 && !bgDirty) {
         fontStore.log(t("lan.success.patch"));
-        showLanCenteredMessage(t("lan.success.patch"));
+        if (!forShare) showLanCenteredMessage(t("lan.success.patch"));
         captureLanBaseline();
-        return;
+        if (activeLocalWatchfaceId) await flushPersistActiveWorkspace();
+        return true;
       } else if (hasBundleLeaf || bgDirty) {
         const dialPack = await resolveLanMultipartDialSecondPart(
           hasBundleLeaf ? userPickedLeafMap : new Map()
@@ -7285,30 +8327,274 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         await divoomJson("Device/PatchLocalClockInfo", meta);
       }
       fontStore.log(t("lan.success.patch"));
-      showLanCenteredMessage(t("lan.success.patch"));
+      if (!forShare) showLanCenteredMessage(t("lan.success.patch"));
       captureLanBaseline();
+      if (activeLocalWatchfaceId) await flushPersistActiveWorkspace();
+      return true;
     } catch (e) {
+      if (forShare) throw e;
       alert(errorToText(e));
       refreshLanActionButtons();
     } finally {
+      controls.forEach((el, i) => { if (el) el.inert = inertBefore[i]; });
+      lanSyncBusy = false;
+      refreshLanActionButtons();
+    }
+  }
+
+  function refreshLanUploadDialogReviewNote() {
+    const sharePublic = dom.lanUploadSharePublic?.checked === true;
+    if (dom.lanUploadClassifyField) dom.lanUploadClassifyField.hidden = !sharePublic;
+    if (dom.lanUploadClassify) {
+      dom.lanUploadClassify.required = sharePublic;
+      dom.lanUploadClassify.setAttribute("aria-required", sharePublic ? "true" : "false");
+      if (!sharePublic) dom.lanUploadClassify.setAttribute("aria-invalid", "false");
+    }
+    if (!sharePublic && dom.lanUploadClassifyError) dom.lanUploadClassifyError.hidden = true;
+    if (!dom.lanUploadReviewNote) return;
+    setNodeText(dom.lanUploadReviewNote, t(
+      sharePublic ? "lan.upload.publicNote" : "lan.upload.privateNote"
+    ));
+  }
+
+  function populateLanUploadClassifyOptions(previousClassifyId = 0) {
+    const select = dom.lanUploadClassify;
+    if (!select) return;
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = t("lan.upload.classifyPlaceholder");
+    select.appendChild(placeholder);
+    const rows = Array.isArray(getTemplateClassifyData()?.ClassifyList)
+      ? getTemplateClassifyData().ClassifyList : [];
+    const displayNameCounts = new Map();
+    for (const row of rows) {
+      const name = getTemplateClassifyDisplayName(row);
+      displayNameCounts.set(name, (displayNameCounts.get(name) || 0) + 1);
+    }
+    for (const row of rows) {
+      const classifyId = toNum(row?.ClassifyId, 0);
+      if (classifyId <= 0) continue;
+      const option = document.createElement("option");
+      option.value = String(classifyId);
+      const displayName = getTemplateClassifyDisplayName(row);
+      const englishName = String(row?.ClassifyNameEn || "").trim();
+      const disambiguatedName = displayNameCounts.get(displayName) > 1 && englishName && englishName !== displayName
+        ? `${displayName} / ${englishName}` : displayName;
+      option.textContent = `${disambiguatedName} (#${classifyId})`;
+      option.title = option.textContent;
+      select.appendChild(option);
+    }
+    const previous = toNum(previousClassifyId, 0);
+    select.value = previous > 0 && [...select.options].some((option) => Number(option.value) === previous)
+      ? String(previous) : "";
+  }
+
+  function focusAppPreviewPicker() {
+    dom.secAppPreviewTitle?.closest?.(".card")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    dom.inputAppPreviewFile?.focus?.();
+  }
+
+  function openLanUploadConfirmDialog({ isUpdate, previousShareToOthers, previousClassifyId }) {
+    const name = resolveLanDeviceCreateClockName();
+    const dlg = dom.lanUploadDialog;
+    const form = dom.lanUploadForm;
+    if (!dlg || !form) {
+      return Promise.resolve(window.confirm(t(
+        isUpdate ? "lan.upload.updateBody" : "lan.upload.confirmBody", { name }
+      )) ? { shareToOthers: false, classifyId: 0, messageInfo: "" } : null);
+    }
+    setNodeText(dom.lanUploadTitle, t(isUpdate ? "lan.upload.updateTitle" : "lan.upload.confirmTitle"));
+    setNodeText(dom.lanUploadBody, t(isUpdate ? "lan.upload.updateBody" : "lan.upload.confirmBody", { name }));
+    if (dom.lanUploadMessageField) dom.lanUploadMessageField.hidden = !isUpdate;
+    if (dom.lanUploadMessage) {
+      dom.lanUploadMessage.value = "";
+      dom.lanUploadMessage.required = isUpdate;
+      dom.lanUploadMessage.setAttribute("aria-required", isUpdate ? "true" : "false");
+      dom.lanUploadMessage.setAttribute("aria-invalid", "false");
+    }
+    if (dom.lanUploadMessageError) dom.lanUploadMessageError.hidden = true;
+    if (dom.lanUploadSharePublic) dom.lanUploadSharePublic.checked = previousShareToOthers === true;
+    populateLanUploadClassifyOptions(previousClassifyId);
+    if (dom.lanUploadClassify) dom.lanUploadClassify.setAttribute("aria-invalid", "false");
+    if (dom.lanUploadClassifyError) dom.lanUploadClassifyError.hidden = true;
+    if (dom.lanUploadSubmit) setNodeText(dom.lanUploadSubmit,
+      t(isUpdate ? "lan.upload.updateSubmit" : "lan.upload.submit"));
+    refreshLanUploadDialogReviewNote();
+
+    return new Promise((resolve) => {
+      const cleanup = () => {
+        form.removeEventListener("submit", onSubmit);
+        dom.lanUploadCancel?.removeEventListener("click", onCancel);
+        dom.lanUploadSharePublic?.removeEventListener("change", refreshLanUploadDialogReviewNote);
+        dom.lanUploadMessage?.removeEventListener("input", onMessageInput);
+        dom.lanUploadMessage?.removeEventListener("invalid", onMessageInvalid);
+        dom.lanUploadClassify?.removeEventListener("change", onClassifyChange);
+        dlg.removeEventListener("cancel", onDialogCancel);
+      };
+      const finish = (value) => {
+        cleanup();
+        if (dlg.open) dlg.close();
+        resolve(value);
+      };
+      const onCancel = () => finish(null);
+      const onDialogCancel = (event) => {
+        event.preventDefault();
+        finish(null);
+      };
+      const setMessageErrorVisible = (visible) => {
+        if (dom.lanUploadMessageError) dom.lanUploadMessageError.hidden = !visible;
+        dom.lanUploadMessage?.setAttribute("aria-invalid", visible ? "true" : "false");
+      };
+      const onMessageInput = () => setMessageErrorVisible(false);
+      const onMessageInvalid = () => setMessageErrorVisible(true);
+      const setClassifyErrorVisible = (visible) => {
+        if (dom.lanUploadClassifyError) dom.lanUploadClassifyError.hidden = !visible;
+        dom.lanUploadClassify?.setAttribute("aria-invalid", visible ? "true" : "false");
+      };
+      const onClassifyChange = () => {
+        setClassifyErrorVisible(false);
+        if (dom.lanUploadClassify) {
+          dom.lanUploadClassify.title = dom.lanUploadClassify.selectedOptions?.[0]?.textContent || "";
+        }
+      };
+      const onSubmit = (event) => {
+        event.preventDefault();
+        const messageInfo = String(dom.lanUploadMessage?.value || "").trim();
+        if (isUpdate && !messageInfo) {
+          setMessageErrorVisible(true);
+          dom.lanUploadMessage?.focus?.();
+          return;
+        }
+        const shareToOthers = dom.lanUploadSharePublic?.checked === true;
+        const classifyId = toNum(dom.lanUploadClassify?.value, 0);
+        if (shareToOthers && classifyId <= 0) {
+          setClassifyErrorVisible(true);
+          dom.lanUploadClassify?.focus?.();
+          return;
+        }
+        finish({
+          shareToOthers,
+          classifyId: shareToOthers ? classifyId : 0,
+          messageInfo: isUpdate ? messageInfo : ""
+        });
+      };
+      form.addEventListener("submit", onSubmit);
+      dom.lanUploadCancel?.addEventListener("click", onCancel);
+      dom.lanUploadSharePublic?.addEventListener("change", refreshLanUploadDialogReviewNote);
+      dom.lanUploadMessage?.addEventListener("input", onMessageInput);
+      dom.lanUploadMessage?.addEventListener("invalid", onMessageInvalid);
+      dom.lanUploadClassify?.addEventListener("change", onClassifyChange);
+      dlg.addEventListener("cancel", onDialogCancel);
+      dlg.showModal();
+      if (isUpdate) dom.lanUploadMessage?.focus?.();
+    });
+  }
+
+  async function onLanShareWatchfaceClick() {
+    if (lanShareBusy || lanSyncBusy || !hasLanDeviceHttpTarget() ||
+      toNum(state.config.ClockId, 0) <= 0 || !hasLanUploadChanges()) return;
+    if (!state.config.ItemList.length) {
+      alert(t("lan.err.emptyItemList"));
+      return;
+    }
+    if (!state.appPreviewImage) {
+      alert(t("lan.upload.previewRequired"));
+      focusAppPreviewPicker();
+      return;
+    }
+    const previewDimensions = validateAppPreviewImage(state.appPreviewImage);
+    if (!previewDimensions.ok) {
+      alert(t("lan.upload.previewDimensions", previewDimensions));
+      focusAppPreviewPicker();
+      return;
+    }
+    const previousUpload = activeOnlineUploadState();
+    const uploadOptions = await openLanUploadConfirmDialog({
+      isUpdate: !!previousUpload,
+      previousShareToOthers: previousUpload?.shareToOthers === true,
+      previousClassifyId: previousUpload?.classifyId || 0
+    });
+    if (!uploadOptions) return;
+    lanShareBusy = true;
+    refreshLanActionButtons();
+    // Keep the selected device and workspace stable through all awaited requests.
+    const controls = [dom.selectLanDevice, dom.btnRefreshLanDevices, dom.mainLayout,
+      dom.appModeLocal, dom.appModeTemplate];
+    const inertBefore = controls.map((el) => el?.inert);
+    controls.forEach((el) => { if (el) el.inert = true; });
+    try {
+      const capabilities = await divoomJson("Device/GetLanCapabilities");
+      if (!capabilities?.SupportsClockShare) throw new Error(t("lan.share.unsupported"));
+      fontStore.log(t("lan.share.busy"));
+      if (hasLanDeviceChanges() && !await onLanApplyWatchfaceConfigClick({ forShare: true })) return;
+      const details = { ClockId: toNum(state.config.ClockId, 0), ClockName: resolveLanDeviceCreateClockName() };
+      const preview = await encodeAppPreviewWebp(state.appPreviewImage);
+      if (!preview) throw new Error(t("lan.upload.webpFailed"));
+      const staged = await postLanMultipartToDevice(LAN_MULTIPART_ENDPOINT.asset,
+        { Command: "Device/UploadLocalAsset" }, preview, "app-preview.webp");
+      if (!/^local:\/\/[A-Za-z0-9_.-]+$/.test(staged?.FileId || "")) throw new Error(t("lan.share.invalidResponse"));
+      details.PreviewImage = staged.FileId;
+      await divoomJson("Device/PatchLocalClockInfo", details);
+      const result = await divoomJson("Device/ShareLocalClock", {
+        ClockId: details.ClockId,
+        ShareToOthers: uploadOptions.shareToOthers,
+        ClassifyId: uploadOptions.classifyId,
+        MessageInfo: uploadOptions.messageInfo
+      });
+      if (!result || Number(result.ReturnCode) !== 0 || result.Shared !== true) {
+        throw new Error(t("lan.share.invalidResponse"));
+      }
+      activeDeviceUploadStates = withDeviceUploadState(
+        activeDeviceUploadStates,
+        resolveClockBindingDeviceId(),
+        {
+          clockId: details.ClockId,
+          shareToOthers: uploadOptions.shareToOthers,
+          classifyId: uploadOptions.classifyId,
+          messageInfo: uploadOptions.messageInfo,
+          uploadedAt: Date.now()
+        }
+      );
+      captureLanUploadBaseline();
+      if (activeLocalWatchfaceId) await flushPersistActiveWorkspace();
+      void refreshLocalWatchfaceStatusForDevice({ force: true });
+      if (dom.lanReviewDialog?.open) void loadLanReviewHistory();
+      const successKey = uploadOptions.shareToOthers ? "lan.share.successPublic" : "lan.share.successPrivate";
+      fontStore.log(t(successKey));
+      showLanCenteredMessage(t(successKey));
+    } catch (e) {
+      alert(errorToText(e));
+    } finally {
+      controls.forEach((el, i) => { if (el) el.inert = inertBefore[i]; });
+      lanShareBusy = false;
       refreshLanActionButtons();
     }
   }
 
   async function lanSubmitDeviceCreateWithName(name) {
-    if (toNum(state.config.ClockId, 0) > 0) return;
+    if (toNum(state.config.ClockId, 0) > 0 || !hasLanDeviceChanges()) return;
     if (!state.config.ItemList.length) {
       alert(t("lan.err.emptyItemList"));
       return;
     }
-    const createBtn = dom.btnLanCreateOnDevice;
-    if (createBtn) createBtn.disabled = true;
+    if (lanSyncBusy || lanShareBusy) return;
+    const operationDeviceId = resolveClockBindingDeviceId();
+    lanSyncBusy = true;
+    refreshLanActionButtons();
+    const controls = [dom.selectLanDevice, dom.btnRefreshLanDevices, dom.mainLayout,
+      dom.appModeLocal, dom.appModeTemplate];
+    const inertBefore = controls.map((el) => el?.inert);
+    controls.forEach((el) => { if (el) el.inert = true; });
     try {
       fontStore.log(t("lan.busy"));
+      await remapUnavailableStateFontsForLan();
       const dialPack = await resolveLanMultipartDialSecondPart();
       assertNonEmptyDialImageBlob(dialPack.blob);
       const baseMeta = buildCreateClockMetadata(name);
-      const sanitized = sanitizeItemListImageAddrForLanUpload(baseMeta.ItemList, dialPack.leafSet);
+      const sanitized = sanitizeItemListImageAddrForLanUpload(
+        baseMeta.ItemList, dialPack.leafSet, new Set(), dialPack.leafByItemIndex
+      );
       const meta = {
         ...baseMeta,
         ItemList: sanitized.items,
@@ -7326,6 +8612,16 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       const createdId = extractLanResponseClockId(data);
       if (Number.isFinite(createdId) && createdId > 0) {
         state.config.ClockId = createdId;
+        activeDeviceUploadStates = withDeviceUploadState(
+          activeDeviceUploadStates,
+          operationDeviceId,
+          null
+        );
+        activeDeviceClockIds = withDeviceClockId(
+          activeDeviceClockIds,
+          operationDeviceId,
+          createdId
+        );
         refreshToolbarClockIdUi();
         rebuildItemEditor();
         fontStore.log(t("lan.success.createClockIdApplied", { id: createdId }));
@@ -7341,6 +8637,8 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       alert(`${formatLanCreateFailureAlert(errorToText(e))}\n\n${t("lan.debug.afterFailureHint")}`);
       refreshLanActionButtons();
     } finally {
+      controls.forEach((el, i) => { if (el) el.inert = inertBefore[i]; });
+      lanSyncBusy = false;
       refreshLanActionButtons();
     }
   }
@@ -7445,7 +8743,9 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
       if (!silent) fontStore.log(t("lan.device.listFailed", { message: msg }));
     } finally {
       if (btn) btn.disabled = false;
-      refreshLanActionButtons();
+      if (activeLocalWatchfaceId) applyCurrentDeviceClockBinding();
+      else refreshLanActionButtons();
+      void refreshLocalWatchfaceStatusForDevice({ force: true });
       refreshTemplateSyncUi();
     }
   }
@@ -7472,28 +8772,37 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
         const id = dom.selectLanDevice.value;
         if (!id) {
           clearPersistedLanDeviceSelection();
-          refreshLanActionButtons();
+          applyCurrentDeviceClockBinding();
+          refreshLocalWatchfaceListUi();
           return;
         }
         const row = lanDeviceRowsById.get(id);
         if (row) persistLanDeviceRow(row);
-        refreshLanActionButtons();
+        const clockId = applyCurrentDeviceClockBinding();
+        void refreshLocalWatchfaceStatusForDevice({ force: true });
+        void selectLocalWatchfaceOnDevice(clockId);
         refreshTemplateSyncUi();
       });
     }
   }
 
   function wireLanUi() {
+    dom.btnLanShareWatchface?.addEventListener("click", () => {
+      if (!dom.btnLanShareWatchface.disabled) void onLanShareWatchfaceClick();
+    });
+    dom.btnLanReviewHistory?.addEventListener("click", () => {
+      if (dom.btnLanReviewHistory.disabled) return;
+      dom.lanReviewDialog?.showModal();
+      void loadLanReviewHistory();
+    });
+    dom.lanReviewRefresh?.addEventListener("click", () => void loadLanReviewHistory());
+    dom.lanReviewClose?.addEventListener("click", () => dom.lanReviewDialog?.close());
+    dom.lanReviewDialog?.addEventListener("close", () => { lanReviewRequestToken += 1; });
     if (dom.btnLanCreateOnDevice) {
       dom.btnLanCreateOnDevice.addEventListener("click", () => {
         if (dom.btnLanCreateOnDevice.disabled) return;
-        openLanCreateConfirmDialogForDeviceCreate();
-      });
-    }
-    if (dom.btnLanApplyWatchfaceConfig) {
-      dom.btnLanApplyWatchfaceConfig.addEventListener("click", () => {
-        if (dom.btnLanApplyWatchfaceConfig.disabled) return;
-        void onLanApplyWatchfaceConfigClick();
+        if (toNum(state.config?.ClockId, 0) > 0) void onLanApplyWatchfaceConfigClick();
+        else openLanCreateConfirmDialogForDeviceCreate();
       });
     }
     if (dom.btnLanShowCurrentClockOnDevice) {
@@ -7536,7 +8845,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     rebuildItemEditor();
     renderWatchface();
     fontStore.log(t("log.configApplied", { source: sourceLabel }));
-    captureLanBaseline();
+    resetLanActionBaselines();
   }
 
   function refreshTemplateListUi() {
@@ -7872,7 +9181,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     renderWatchface();
     fontStore.log(t("log.templateApplied", { id, resourceSummary: summaryParts.join(" ") }));
     refreshTemplateListUi();
-    captureLanBaseline();
+    resetLanActionBaselines();
     syncWorkspaceBaseline();
     refreshSidebarBrowseChrome();
   }
@@ -8206,7 +9515,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
     const fileInput = document.createElement("input");
     fileInput.type = "file";
-    fileInput.accept = "image/jpeg,image/jpg,image/gif,image/webp,.jpg,.jpeg,.jfif,.webp,.gif";
+    fileInput.accept = "image/jpeg,image/jpg,image/gif,image/webp,.jpg,.jpeg,.jfif,.webp,.gif,.bin,.divm";
 
     const infoGrid = document.createElement("div");
     infoGrid.className = "asset-info-grid";
@@ -9034,7 +10343,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
     return { tier, stableIdx };
   }
 
-  function renderWatchface() {
+  function renderWatchface({ showSelection = true } = {}) {
     if (dom.canvas.width !== state.width) dom.canvas.width = state.width;
     if (dom.canvas.height !== state.height) dom.canvas.height = state.height;
     drawBackground(watchCtx);
@@ -9071,7 +10380,7 @@ const LOCAL_FILE_PICK_MAX_BYTES = 500 * 1024;
 
     /** 选中框最后绘制，盖住所有元素（不受 hier 叠放顺序遮挡）。 */
     if (
-      sidebarBrowseMode === "local" &&
+      showSelection && sidebarBrowseMode === "local" &&
       state.selectedIndex >= 0 &&
       state.selectedIndex < list.length
     ) {

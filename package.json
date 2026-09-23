@@ -27,5 +27,8 @@
   "devDependencies": {
     "http-proxy": "^1.18.1",
     "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@jsquash/jpeg": "^1.6.0"
   }
 }

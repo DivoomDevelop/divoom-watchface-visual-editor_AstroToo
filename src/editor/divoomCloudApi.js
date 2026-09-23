@@ -2,6 +2,7 @@ import { buildDivoomLanEnvelope } from "./divoomLanJson.js";
 
 /** 与固件 `DIVOOM_SERVER_HTTP_CHINA_URL` 一致（表盘商店 JSON API）。 */
 export const DIVOOM_CHINA_API_BASE = "https://appchina.divoom-gz.com:9506";
+const DIVOOM_CHINA_REVIEW_API_BASE = "https://appchina.divoom-gz.com";
 
 /**
  * 浏览器经 Vite `/divoom-china-api` 代理，避免 CORS；代理目标可用 `DIVOOM_CHINA_API_TARGET` 覆盖（部分环境 HTTPS 握手失败时可改为 http）。
@@ -9,13 +10,16 @@ export const DIVOOM_CHINA_API_BASE = "https://appchina.divoom-gz.com:9506";
 export function resolveChinaStoreApiUrl(command) {
   const cmd = String(command || "").trim().replace(/^\//, "");
   if (!cmd) throw new Error("empty store API command");
+  const isReviewCommand = cmd === "Channel/GetUserClockReview"
+    || cmd === "Channel/GetDeviceClockInfo";
   const useProxy =
     typeof import.meta !== "undefined" &&
     import.meta.env?.VITE_DIVOOM_CHINA_DIRECT !== "1";
   if (useProxy) {
-    return `/divoom-china-api/${cmd}`;
+    return `/${isReviewCommand ? "divoom-china-review-api" : "divoom-china-api"}/${cmd}`;
   }
-  return `${DIVOOM_CHINA_API_BASE.replace(/\/$/, "")}/${cmd}`;
+  const base = isReviewCommand ? DIVOOM_CHINA_REVIEW_API_BASE : DIVOOM_CHINA_API_BASE;
+  return `${base.replace(/\/$/, "")}/${cmd}`;
 }
 
 /**

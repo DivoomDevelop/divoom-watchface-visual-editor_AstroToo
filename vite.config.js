@@ -139,6 +139,8 @@ const cloudProxy = {
 
 const defaultChinaApiTarget =
   process.env.DIVOOM_CHINA_API_TARGET || "http://appchina.divoom-gz.com:9506";
+const defaultChinaReviewApiTarget =
+  process.env.DIVOOM_CHINA_REVIEW_API_TARGET || "https://appchina.divoom-gz.com";
 
 function createChinaStoreApiMiddleware() {
   const proxy = httpProxy.createProxyServer({
@@ -147,11 +149,12 @@ function createChinaStoreApiMiddleware() {
   });
   const target = defaultChinaApiTarget.replace(/\/$/, "");
   return function divoomChinaApiProxy(req, res, next) {
-    if (!req.url?.startsWith("/divoom-china-api")) return next();
-    const pathOnly = req.url.replace(/^\/divoom-china-api/, "") || "/";
+    const review = req.url?.startsWith("/divoom-china-review-api/");
+    if (!review && !req.url?.startsWith("/divoom-china-api/")) return next();
+    const pathOnly = req.url.replace(review ? /^\/divoom-china-review-api/ : /^\/divoom-china-api/, "") || "/";
     req.url = pathOnly;
-    proxy.web(req, res, { target }, (err) => {
-      console.error("[divoom-china-api]", err?.message || err);
+    proxy.web(req, res, { target: review ? defaultChinaReviewApiTarget : target }, (err) => {
+      console.error(review ? "[divoom-china-review-api]" : "[divoom-china-api]", err?.message || err);
       if (!res.headersSent) {
         res.statusCode = 502;
         res.end("Bad Gateway");
@@ -223,6 +226,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(process.cwd(), "src")
       }
+    },
+    optimizeDeps: {
+      exclude: ["@jsquash/jpeg"]
     },
     server: {
       proxy: {

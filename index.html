@@ -33,10 +33,11 @@
           <select id="select-lan-device"></select>
         </label>
         <button id="btn-refresh-lan-devices" type="button" class="btn-ghost btn-lan-device-refresh"></button>
-        <button id="btn-lan-copy-debug" type="button" class="btn-ghost btn-lan"></button>
-        <button id="btn-lan-create-on-device" type="button" class="btn-ghost btn-lan"></button>
-        <button id="btn-lan-apply-config" type="button" class="btn-lan" disabled></button>
-        <button id="btn-lan-show-current-clock" type="button" class="btn-lan" hidden></button>
+        <button id="btn-lan-copy-debug" type="button" class="btn-ghost"></button>
+        <button id="btn-lan-create-on-device" type="button" class="btn-ghost" aria-live="polite" disabled></button>
+        <button id="btn-lan-share-watchface" type="button" class="btn-lan" aria-live="polite" disabled></button>
+        <button id="btn-lan-review-history" type="button" class="btn-ghost" disabled></button>
+        <button id="btn-lan-show-current-clock" type="button" class="btn-ghost" hidden></button>
         <button id="btn-view-pending-fonts" type="button" class="btn-ghost btn-view-pending-fonts" hidden></button>
         <button id="btn-sync-fonts" type="button" class="btn-ghost btn-sync-fonts"></button>
         <button id="btn-sync-disp" type="button" class="btn-ghost btn-sync-disp"></button>
@@ -83,6 +84,7 @@
           <label id="lbl-input-app-preview-file" for="input-app-preview-file">选择预览图</label>
           <input id="input-app-preview-file" type="file" accept="image/*" />
         </div>
+        <p id="app-preview-requirement" class="hint app-preview-requirement"></p>
         <div class="field-row">
           <label id="lbl-app-preview-source-path" for="txt-app-preview-source-path">预览图路径</label>
           <input id="txt-app-preview-source-path" type="text" readonly class="bg-source-path" autocomplete="off" spellcheck="false" />
@@ -213,6 +215,56 @@
         <button type="submit" id="lan-create-submit" class="btn-primary"></button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="lan-upload-dialog" class="lan-dialog lan-upload-dialog"
+    aria-labelledby="lan-upload-title" aria-describedby="lan-upload-body lan-upload-review-note">
+    <form id="lan-upload-form" novalidate>
+      <h3 id="lan-upload-title" class="lan-dialog-title"></h3>
+      <p id="lan-upload-body" class="lan-dialog-body"></p>
+      <label id="lan-upload-message-field" class="lan-dialog-field" hidden>
+        <span id="lan-upload-message-label"></span>
+        <textarea id="lan-upload-message" rows="3" maxlength="500" spellcheck="true"
+          aria-describedby="lan-upload-message-hint lan-upload-message-error"></textarea>
+        <small id="lan-upload-message-hint"></small>
+        <small id="lan-upload-message-error" class="lan-upload-message-error" role="alert" hidden></small>
+      </label>
+      <label class="lan-upload-option" for="lan-upload-share-public">
+        <input id="lan-upload-share-public" type="checkbox" aria-describedby="lan-upload-review-note" />
+        <span id="lan-upload-share-public-label"></span>
+      </label>
+      <label id="lan-upload-classify-field" class="lan-dialog-field lan-upload-classify-field" hidden>
+        <span id="lan-upload-classify-label"></span>
+        <select id="lan-upload-classify"
+          aria-describedby="lan-upload-classify-hint lan-upload-classify-error"></select>
+        <small id="lan-upload-classify-hint"></small>
+        <small id="lan-upload-classify-error" class="lan-upload-message-error" role="alert" hidden></small>
+      </label>
+      <p id="lan-upload-review-note" class="lan-upload-review-note" aria-live="polite"></p>
+      <div class="lan-dialog-actions">
+        <button type="button" id="lan-upload-cancel" class="btn-ghost"></button>
+        <button type="submit" id="lan-upload-submit" class="btn-primary"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="lan-review-dialog" class="lan-dialog lan-review-dialog" aria-labelledby="lan-review-title">
+    <div class="lan-review-dialog__inner">
+      <h3 id="lan-review-title" class="lan-dialog-title"></h3>
+      <p id="lan-review-context" class="lan-review-context"></p>
+      <div class="lan-review-status-card">
+        <span id="lan-review-status-label" class="lan-review-eyebrow"></span>
+        <strong id="lan-review-status"></strong>
+        <p id="lan-review-status-note"></p>
+      </div>
+      <h4 id="lan-review-list-title" class="lan-review-list-title"></h4>
+      <ol id="lan-review-list" class="lan-review-list" aria-live="polite"></ol>
+      <p id="lan-review-empty" class="lan-review-empty"></p>
+      <div class="lan-dialog-actions">
+        <button id="lan-review-refresh" type="button" class="btn-ghost"></button>
+        <button id="lan-review-close" type="button" class="btn-primary"></button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="lan-message-dialog" class="lan-dialog lan-message-dialog" aria-labelledby="lan-message-dialog-body">

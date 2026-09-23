@@ -31,6 +31,8 @@ export function serializePendingTemplateCache({
       items: (Array.isArray(row?.items) ? row.items : []).map((it) => ({
         clockId: Number(it?.clockId),
         clockName: String(it?.clockName || ""),
+        clockNameCn: String(it?.clockNameCn || ""),
+        clockNameEn: String(it?.clockNameEn || ""),
         imagePixelId: String(it?.imagePixelId || ""),
         classifyId: Number(it?.classifyId ?? row?.ClassifyId),
         reason: it?.reason === "outdated" ? "outdated" : "missing",
@@ -53,6 +55,8 @@ export function parsePendingTemplateCache(raw) {
       items.push({
         clockId,
         clockName: String(it?.clockName || ""),
+        clockNameCn: String(it?.clockNameCn || ""),
+        clockNameEn: String(it?.clockNameEn || ""),
         imagePixelId: String(it?.imagePixelId || ""),
         classifyId: Number(it?.classifyId ?? classifyId),
         reason: it?.reason === "outdated" ? "outdated" : "missing",

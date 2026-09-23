@@ -13,6 +13,12 @@ npm run dev
 
 Open `http://127.0.0.1:5173/` in the browser. The app must be served over **HTTP** so `font/` and `template/` can load.
 
+## Watchface upload and review
+
+The editor can create a watchface on a selected AstroToo, update its device configuration, upload it privately or submit it for public review, and show its current server status in **My designs**. Status is matched by the selected device's `DeviceId` and that design's `ClockId`. An APP preview image (no more than 480×480 pixels) is required for upload and is converted to WebP automatically.
+
+For usage, protocol details, and the `Status` meanings, see [Watchface upload and review (English)](docs/WATCHFACE_SHARE.en.md) or [表盘上传与审核（中文）](docs/WATCHFACE_SHARE.md). The feature needs device firmware with `SupportsClockShare` and a Vite-backed HTTP preview for the LAN/cloud proxy routes.
+
 ## Build
 
 ```bash
@@ -34,8 +40,8 @@ The editor **must** be served over **HTTP**. Opening `index.html` directly (`fil
 
 - If `dist\index.html` is missing and `package.json` is present, it runs `**npm run build`** (requires **Node.js** / `npm` on your PATH).
 - It starts an HTTP server on **port 8765**, then opens your default browser to `http://127.0.0.1:8765/` after a short delay.
-- **Python 3** is preferred: the script serves the `**dist`** folder with `python -m http.server` (looks for `py`, `python`, or `python3` on PATH).
-- If Python is not found but `**node_modules**` exists (after `npm install`), it falls back to `**npm run preview -- --host 127.0.0.1 --port 8765**`.
+- **Vite preview** is preferred so LAN-device discovery and the cloud/CDN proxy routes remain available.
+- If Vite is unavailable, Python 3 is used only as a static-preview fallback; proxy-dependent features such as device refresh are unavailable in that mode.
 
 **How to stop the server**
 
@@ -47,7 +53,8 @@ Close the minimized “Divoom HTTP” console window, or press **Ctrl+C** in tha
 | Situation                         | What you need                                                   |
 | --------------------------------- | --------------------------------------------------------------- |
 | Script should auto-create `dist/` | Node.js + npm; then run once `npm install` in the repo root     |
-| Only serve existing `dist/`       | Python 3 on PATH, **or** `npm install` + Vite fallback as above |
+| Serve `dist/` with all features   | Node.js + npm + Vite (installed by `npm install`)               |
+| Static preview only               | Python 3 on PATH; proxy-dependent features are unavailable      |
 
 
 ### Option B — From `dist/` after build

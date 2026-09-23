@@ -1,5 +1,6 @@
 /** 仿真设备：不扫描 LAN，用固定 DeviceId/DeviceType 调用中国区商店 API。 */
-export const SIMULATED_DEVICE_ENABLED = true;
+// Default to real LAN devices; simulation remains available for explicit development use.
+export const SIMULATED_DEVICE_ENABLED = false;
 
 export const SIMULATED_DEVICE = Object.freeze({
   DeviceId: 300396998,
@@ -18,7 +19,7 @@ export function getSimulatedDeviceId() {
 }
 
 export function getSimulatedDeviceType() {
-  return SIMULATED_DEVICE_ENABLED ? SIMULATED_DEVICE.DeviceType : "Frame";
+  return SIMULATED_DEVICE.DeviceType;
 }
 
 /** @returns {typeof SIMULATED_DEVICE[]} */

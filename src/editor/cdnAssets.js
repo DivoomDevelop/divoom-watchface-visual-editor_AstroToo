@@ -28,6 +28,38 @@ export function extFromAssetPath(path) {
   return m ? `.${m[1].toLowerCase()}` : ".bin";
 }
 
+function readAscii(bytes, start, len) {
+  let s = "";
+  for (let i = 0; i < len; i++) s += String.fromCharCode(bytes[start + i] || 0);
+  return s;
+}
+
+export function extFromImageBytes(bytesLike) {
+  const bytes = bytesLike instanceof Uint8Array ? bytesLike : new Uint8Array(bytesLike || []);
+  if (bytes.length >= 4 && readAscii(bytes, 0, 4) === "DIVM") return ".bin";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return ".jpg";
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return ".png";
+  }
+  const sig6 = bytes.length >= 6 ? readAscii(bytes, 0, 6) : "";
+  if (sig6 === "GIF87a" || sig6 === "GIF89a") return ".gif";
+  if (bytes.length >= 12 && readAscii(bytes, 0, 4) === "RIFF" && readAscii(bytes, 8, 4) === "WEBP") {
+    return ".webp";
+  }
+  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return ".bmp";
+  return "";
+}
+
 export async function downloadAssetBytes(fileAddr, { useCdnProxy = false, origin = "", signal } = {}) {
   const url = resolveCdnFetchUrl(fileAddr, { useProxy: useCdnProxy, origin });
   if (!url) throw new Error("empty asset url");

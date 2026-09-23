@@ -451,9 +451,50 @@ button:disabled {
 }
 
 .local-watchface-list .local-watch-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 1;
   min-width: 0;
   cursor: pointer;
+}
+
+.local-watch-row-main .template-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-watch-status {
+  flex: none;
+  padding: 2px 5px;
+  border: 1px solid #d8e2ef;
+  border-radius: 5px;
+  color: #64748b;
+  background: #f6f8fb;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.local-watch-status--waitingUser,
+.local-watch-status--waitingAdmin {
+  color: #9a611b;
+  border-color: #f1dbaf;
+  background: #fff9ed;
+}
+
+.local-watch-status--approved {
+  color: #247451;
+  border-color: #bce4cf;
+  background: #effaf3;
+}
+
+.local-watch-status--rejected {
+  color: #a94b3e;
+  border-color: #efc7c0;
+  background: #fff4f1;
 }
 
 .local-watch-delete,
@@ -969,13 +1010,20 @@ button:disabled {
   margin-bottom: 16px;
 }
 
-.lan-dialog-field input {
+.lan-dialog-field input,
+.lan-dialog-field textarea,
+.lan-dialog-field select {
   padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
+  resize: vertical;
+}
+
+.lan-upload-classify-field {
+  margin-top: 12px;
 }
 
 .lan-dialog-actions {
@@ -983,6 +1031,100 @@ button:disabled {
   justify-content: flex-end;
   gap: 10px;
 }
+
+.app-preview-requirement {
+  margin: -2px 0 10px;
+  line-height: 1.45;
+}
+
+.lan-upload-dialog {
+  width: min(460px, 92vw);
+  max-width: min(460px, 92vw);
+}
+
+.lan-upload-dialog .lan-dialog-body {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.lan-upload-message-error {
+  color: var(--danger, #b42318);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lan-upload-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lan-upload-option input {
+  margin-top: 2px;
+}
+
+.lan-upload-review-note {
+  min-height: 38px;
+  margin: 9px 2px 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lan-review-dialog {
+  width: min(500px, 92vw);
+  max-width: min(500px, 92vw);
+}
+
+.lan-review-dialog__inner {
+  padding: 20px 22px;
+}
+
+.lan-review-context,
+.lan-review-status-card p,
+.lan-review-empty {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lan-review-context { margin: -4px 0 16px; }
+
+.lan-review-status-card {
+  display: grid;
+  gap: 7px;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.lan-review-eyebrow { color: var(--muted); font-size: 12px; }
+.lan-review-status-card strong { font-size: 15px; }
+.lan-review-status-card .lan-review-status--pending { color: var(--accent-strong); }
+.lan-review-status-card .lan-review-status--approved { color: #237148; }
+.lan-review-status-card .lan-review-status--rejected { color: #ae3f3b; }
+.lan-review-status-card p { margin: 0; }
+.lan-review-list-title { margin: 20px 0 8px; font-size: 14px; }
+.lan-review-list { max-height: 240px; overflow-y: auto; margin: 0; padding-left: 24px; }
+.lan-review-list li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.lan-review-list li strong,
+.lan-review-list li span { display: block; overflow-wrap: anywhere; }
+.lan-review-entry--admin strong { color: var(--accent-strong); }
+.lan-review-entry--user strong { color: #27658f; }
+.lan-review-list li span { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.lan-review-empty { margin: 0 0 18px; }
 
 .lan-message-dialog__inner {
   padding: 22px 24px 18px;
@@ -1850,14 +1992,22 @@ button:hover:not(:disabled),
 @media (max-width: 1280px) {
   .topbar {
     gap: 10px;
+    flex-wrap: wrap;
   }
 
   .title-wrap {
-    flex-basis: 260px;
+    flex: 1 1 260px;
+  }
+
+  .top-actions {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
   }
 
   .layout-mode-local.layout {
-    grid-template-columns: 380px minmax(340px, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
   }
 
   .layout-mode-template.layout {
@@ -1866,10 +2016,17 @@ button:hover:not(:disabled),
 
   .layout-mode-local.layout .left-panel,
   .layout-mode-local.layout .right-panel {
-    overflow: auto;
+    overflow: visible;
   }
 
   .layout-mode-local.layout .center-panel {
-    min-height: 0;
+    min-height: 600px;
+  }
+}
+
+@media (max-width: 900px) {
+  .layout-mode-template.layout {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
   }
 }

@@ -4,6 +4,7 @@
  * 本脚本仍使用单文件 JPEG（DialAssets=image）作为最小连通性探测。
  * 用法: node scripts/lan-probe.mjs 192.168.1.5
  *   或: DIVOOM_LAN_IP=192.168.1.5 npm run lan:probe
+ *   可选: DIVOOM_LAN_JPEG_SOURCE=/path/to/clock_bg.jpg（使用指定 JPEG，不再生成测试图）
  * 依赖: 系统 PATH 中有 curl；本机有 python + Pillow（用于生成 480×480 测试 JPEG）。
  */
 import { spawnSync } from "node:child_process";
@@ -68,15 +69,20 @@ function buildCreateLocalClockMultipartBody(metaUtf8Buffer, jpgBuffer) {
   };
 }
 
-const py = process.platform === "win32" ? "python" : "python3";
-const gen = sh(py, [
-  "-c",
-  `from PIL import Image; Image.new('RGB',(480,480),(20,30,50)).save(r'${jpgPath.replace(/\\/g, "\\\\")}','JPEG',quality=80)`
-]);
-if (gen.status !== 0) {
-  console.error("Need Python 3 with Pillow (pip install pillow) to generate probe JPEG.");
-  if (gen.stderr) console.error(gen.stderr);
-  process.exit(1);
+const jpegSource = String(process.env.DIVOOM_LAN_JPEG_SOURCE || "").trim();
+if (jpegSource) {
+  fs.copyFileSync(jpegSource, jpgPath);
+} else {
+  const py = process.platform === "win32" ? "python" : "python3";
+  const gen = sh(py, [
+    "-c",
+    `from PIL import Image; Image.new('RGB',(480,480),(20,30,50)).save(r'${jpgPath.replace(/\\/g, "\\\\")}','JPEG',quality=80)`
+  ]);
+  if (gen.status !== 0) {
+    console.error("Need Python 3 with Pillow (pip install pillow) to generate probe JPEG.");
+    if (gen.stderr) console.error(gen.stderr);
+    process.exit(1);
+  }
 }
 
 const getPayload = JSON.stringify({
@@ -129,12 +135,12 @@ const meta = {
       hier: 0,
       transp: 100,
       animation: 0,
-      item_id: "",
+      item_id: "DispItem_1",
       color_1: "#000000",
       color_2: "#ff0000"
     }
   ],
-  ItemIdList: [""]
+  ItemIdList: ["DispItem_1"]
 };
 fs.writeFileSync(metaPath, JSON.stringify(meta), "utf8");
 

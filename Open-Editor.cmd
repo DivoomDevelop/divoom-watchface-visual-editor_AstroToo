@@ -72,6 +72,13 @@ if not exist "%DISTDIR%\index.html" (
   )
 )
 
+if exist "%~dp0node_modules\vite\package.json" (
+  echo [Divoom] 使用 Vite 预览（端口 %PORT%）...
+  cd /d "%~dp0"
+  start "Divoom HTTP" /min cmd /k "chcp 65001 >nul & title Divoom Vite %PORT% & npm run preview -- --host 127.0.0.1 --port %PORT%"
+  goto :open_browser
+)
+
 where py >nul 2>&1 && goto :serve_py
 where python >nul 2>&1 && goto :serve_py
 where python3 >nul 2>&1 && goto :serve_py
@@ -82,14 +89,7 @@ where py >nul 2>&1 && goto :serve_py
 where python >nul 2>&1 && goto :serve_py
 where python3 >nul 2>&1 && goto :serve_py
 
-if exist "%~dp0node_modules\vite\package.json" (
-  echo [Divoom] 使用 Vite 预览（端口 %PORT%）...
-  cd /d "%~dp0"
-  start "Divoom HTTP" /min cmd /k "chcp 65001 >nul & title Divoom Vite %PORT% & npm run preview -- --host 127.0.0.1 --port %PORT%"
-  goto :open_browser
-)
-
-echo [Divoom] 错误：未找到 Python（py / python / python3），且 Vite 依赖仍未就绪。
+echo [Divoom] 错误：Vite 依赖未就绪，且未找到 Python（py / python / python3）。
 echo 请关闭本窗口后重新打开再试一遍，或手动在「开始」菜单运行 Python 安装程序完成配置。
 pause
 exit /b 1

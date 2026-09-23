@@ -71,6 +71,7 @@ function readAscii(bytes, offset, len) {
 /** 按文件头识别图片后缀（导出命名用，避免一律 .bin）。 */
 export function extFromImageBytes(buf) {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf || []);
+  if (bytes.length >= 4 && readAscii(bytes, 0, 4) === "DIVM") return ".bin";
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return ".jpg";
   if (
     bytes.length >= 8 &&
@@ -204,6 +205,7 @@ function reconcileExportFileName(plannedName, preferredExt) {
   const stem = dot > 0 ? plannedName.slice(0, dot) : plannedName;
   const currentExt = dot > 0 ? plannedName.slice(dot) : "";
   if (currentExt.toLowerCase() === normalized.toLowerCase()) return plannedName;
+  if (/\.bin$/i.test(normalized)) return `${stem}${normalized}`;
   if (/\.bin$/i.test(currentExt) || !KNOWN_IMAGE_EXTS.test(plannedName)) {
     return `${stem}${normalized}`;
   }

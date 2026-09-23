@@ -70,7 +70,18 @@ export async function scanPendingFontsFromStore({ storeJson, loadFontInfo, check
   }
 
   items.sort((a, b) => a.id - b.id);
-  const mergedFontInfo = mergeFontInfoEntries(localInfo, remoteList);
+  /* GetTimeDialFontV2 is the complete current catalogue.  Treat it as an
+   * authoritative snapshot so fonts removed by the server do not remain
+   * selectable forever in the local font_info.cfg.  Keep only a local name
+   * fallback for still-existing IDs when the server omits the display name. */
+  const mergedFontInfo = {
+    FontList: remoteList
+      .map((remote) => ({
+        ...remote,
+        name: remote.name || localById.get(remote.id)?.name || `Font ${remote.id}`
+      }))
+      .sort((a, b) => a.id - b.id)
+  };
   return { items, remoteTotal: remoteList.length, mergedFontInfo };
 }
 
