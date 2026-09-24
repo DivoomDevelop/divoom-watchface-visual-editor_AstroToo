@@ -2439,6 +2439,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (!dom.txtBgSourcePath) return;
     dom.txtBgSourcePath.value = state.backgroundSourceLabel || "";
     dom.txtBgSourcePath.title = state.backgroundSourceLabel || "";
+    if (dom.bgResourcePreview) {
+      const src = state.backgroundImage?.src || state.backgroundObjectUrl || "";
+      if (src) dom.bgResourcePreview.src = src;
+      else dom.bgResourcePreview.removeAttribute("src");
+      dom.bgResourcePreview.hidden = !src;
+    }
   }
 
   function refreshAppPreviewSourceLabel() {
@@ -2446,6 +2452,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (!dom.txtAppPreviewSourcePath) return;
     dom.txtAppPreviewSourcePath.value = state.appPreviewSourceLabel || "";
     dom.txtAppPreviewSourcePath.title = state.appPreviewSourceLabel || "";
+    if (dom.appResourcePreview) {
+      const src = state.appPreviewImage?.src || state.appPreviewObjectUrl || "";
+      if (src) dom.appResourcePreview.src = src;
+      else dom.appResourcePreview.removeAttribute("src");
+      dom.appResourcePreview.hidden = !src;
+    }
   }
 
   function refreshWatchDescFields() {
@@ -3098,6 +3110,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     inputImportWatchfaceJson: byId("input-import-watchface-json"),
     localWatchHint: byId("local-watch-hint"),
     localWatchfaceList: byId("local-watchface-list"),
+    secLocalWatchTitle: byId("sec-local-watch-title"),
     secCanvasTitle: byId("sec-canvas-title"),
     secBackgroundTitle: byId("sec-background-title"),
     secAppPreviewTitle: byId("sec-app-preview-title"),
@@ -3126,9 +3139,11 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     inputZoom: byId("input-zoom"),
     txtZoom: byId("txt-zoom"),
     inputBgFile: byId("input-bg-file"),
+    bgResourcePreview: byId("bg-resource-preview"),
     txtBgSourcePath: byId("txt-bg-source-path"),
     btnClearBg: byId("btn-clear-bg"),
     inputAppPreviewFile: byId("input-app-preview-file"),
+    appResourcePreview: byId("app-resource-preview"),
     txtAppPreviewSourcePath: byId("txt-app-preview-source-path"),
     btnClearAppPreview: byId("btn-clear-app-preview"),
     txtDescCn: byId("txt-desc-cn"),
@@ -3857,6 +3872,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       setNodeText(dom.templateDownloadTitle, t("template.pending.downloadingTitle", { name: "" }));
     }
 
+    if (dom.secLocalWatchTitle) setNodeText(dom.secLocalWatchTitle, t("ui.sec.localWatch"));
     setNodeText(dom.secCanvasTitle, t("ui.sec.canvas"));
     setNodeText(dom.secBackgroundTitle, t("ui.sec.background"));
     if (dom.secAppPreviewTitle) setNodeText(dom.secAppPreviewTitle, t("ui.sec.appPreview"));
@@ -5647,18 +5663,35 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (dom.localWatchHint) {
       dom.localWatchHint.textContent =
         rows.length === 0 ? t("localWatch.listEmpty") : t("localWatch.listHint");
+      dom.localWatchHint.title = dom.localWatchHint.textContent;
     }
     ul.innerHTML = "";
     const deviceId = resolveClockBindingDeviceId();
     for (const row of rows) {
       const li = document.createElement("li");
       if (row.id === activeLocalWatchfaceId) li.classList.add("active");
-      const main = document.createElement("div");
+      const main = document.createElement("button");
+      main.type = "button";
       main.className = "local-watch-row-main";
+      const thumb = document.createElement("span");
+      thumb.className = "local-watch-thumb";
+      const thumbSrc = row.appPreviewDataUrl || row.backgroundDataUrl || "";
+      if (thumbSrc) {
+        const img = document.createElement("img");
+        img.src = thumbSrc;
+        img.alt = "";
+        img.loading = "lazy";
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = "480 × 480";
+      }
+      const meta = document.createElement("span");
+      meta.className = "local-watch-meta";
       const title = document.createElement("span");
       title.className = "template-id";
       title.textContent = row.name || row.id;
       title.title = title.textContent;
+      main.title = title.textContent;
       const clockIdOnRecord = getDeviceClockId(
         normalizeDeviceClockBindings(row, deviceId), deviceId
       );
@@ -5667,7 +5700,17 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       badge.className = `local-watch-status local-watch-status--${status.key}`;
       badge.textContent = t(`localWatch.status.${status.key}`);
       badge.title = t(`localWatch.statusTip.${status.tip}`);
-      main.append(title, badge);
+      meta.append(title, badge);
+      const updatedAt = Number(row.updatedAt);
+      if (Number.isFinite(updatedAt) && updatedAt > 0) {
+        const date = document.createElement("span");
+        date.className = "local-watch-date";
+        date.textContent = new Date(updatedAt).toLocaleString(getLocaleCode(), {
+          year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
+        });
+        meta.appendChild(date);
+      }
+      main.append(thumb, meta);
       main.addEventListener("click", () => {
         void loadLocalWatchfaceById(row.id);
       });

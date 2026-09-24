@@ -1,5 +1,5 @@
 const zhCN = Object.freeze({
-  "ui.appTitle": "Divoom 表盘 PC 预览与编辑器",
+  "ui.appTitle": "AstroToo Studio",
   "ui.appSubtitle": "从模板或我的设计列表编辑表盘，修改会自动保存到浏览器本地存储。",
   "ui.language": "语言",
   "ui.label.lanDevice": "LAN 设备",
@@ -12,12 +12,12 @@ const zhCN = Object.freeze({
   "ui.tab.templateWatchfaces": "模板表盘",
   "browseTemplate.toolbarHint": "当前为模板浏览（只读）。单击列表预览；双击某项或点击「应用模板」可复制到我的设计后继续编辑。",
   "browseTemplate.savedFromTemplate": "已从模板 #{templateId} 复制到我的设计：{name}",
-  "ui.sec.canvas": "2) 画布",
+  "ui.sec.canvas": "画布缩放",
   "ui.sec.background": "表盘底图",
   "ui.sec.appPreview": "APP预览图",
   "ui.sec.watchDesc": "表盘描述",
-  "ui.sec.items": "3) 显示元素(ItemList)",
-  "ui.sec.editor": "4) 选中元素编辑",
+  "ui.sec.items": "显示元素",
+  "ui.sec.editor": "选中元素编辑",
 
   "ui.label.loadConfig": "加载表盘配置(JSON)",
   "ui.label.pasteJson": "或粘贴 JSON",

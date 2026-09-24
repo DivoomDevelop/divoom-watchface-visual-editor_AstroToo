@@ -1,5 +1,5 @@
 const enUS = Object.freeze({
-  "ui.appTitle": "Divoom Watchface PC Preview Editor",
+  "ui.appTitle": "AstroToo Studio",
   "ui.appSubtitle": "Edit watchfaces from templates or My designs; changes autosave to browser storage.",
   "ui.language": "Language",
   "ui.label.lanDevice": "LAN device",
@@ -12,12 +12,12 @@ const enUS = Object.freeze({
   "ui.tab.templateWatchfaces": "Templates",
   "browseTemplate.toolbarHint": "Template browse is read-only. Click an item for preview (thumbnail from template/33). Double‑click one or use Apply to save a copy to My designs for editing.",
   "browseTemplate.savedFromTemplate": "Copied template #{templateId} to My designs: {name}",
-  "ui.sec.canvas": "2) Canvas",
+  "ui.sec.canvas": "Canvas zoom",
   "ui.sec.background": "Watchface background",
   "ui.sec.appPreview": "APP preview image",
   "ui.sec.watchDesc": "Watchface description",
-  "ui.sec.items": "3) Display Items (ItemList)",
-  "ui.sec.editor": "4) Selected Item Editor",
+  "ui.sec.items": "Display items",
+  "ui.sec.editor": "Selected item editor",
 
   "ui.label.loadConfig": "Load watchface config (JSON)",
   "ui.label.pasteJson": "Or paste JSON",

@@ -399,6 +399,14 @@
       ]
     },
     {
+      "ClassifyId": 108,
+      "ClassifyName": "复古科技",
+      "ClassifyNameEn": "Retro Tech",
+      "clockid": [
+        1888
+      ]
+    },
+    {
       "ClassifyId": 112,
       "ClassifyName": "艺术家联名",
       "ClassifyNameEn": "Artists’ Gallery",
@@ -553,5 +561,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-09-23T08:32:45.233Z"
+  "generatedAt": "2026-09-24T01:02:14.592Z"
 }
