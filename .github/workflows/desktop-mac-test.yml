@@ -55,6 +55,21 @@ jobs:
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" out-desktop/*-mac-${{ matrix.arch }}.dmg
           trap 'hdiutil detach "$mount" || true' EXIT
           codesign --verify --deep --strict --verbose=2 "$mount/AstroToo Watchface Editor.app"
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            open -n "$mount/AstroToo Watchface Editor.app" --args --remote-debugging-port=19345
+            ready=0
+            for attempt in $(seq 1 30); do
+              if curl -fsS --max-time 1 http://127.0.0.1:19345/json/list -o "$RUNNER_TEMP/astrotoo-pages.json" 2>/dev/null; then
+                if python3 -c 'import json,sys; pages=json.load(open(sys.argv[1])); assert any(p.get("type") == "page" and p.get("url", "").startswith("astrotoo://app/") for p in pages)' "$RUNNER_TEMP/astrotoo-pages.json"; then
+                  ready=1
+                  break
+                fi
+              fi
+              sleep 1
+            done
+            test "$ready" -eq 1
+            echo 'Packaged arm64 app loaded astrotoo://app/'
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: astrotoo-macos-${{ matrix.arch }}-adhoc-test
