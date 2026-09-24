@@ -4,7 +4,7 @@ module.exports = {
   ...base,
   mac: {
     ...base.mac,
-    identity: null,
+    identity: "-",
     hardenedRuntime: false,
     notarize: false
   }

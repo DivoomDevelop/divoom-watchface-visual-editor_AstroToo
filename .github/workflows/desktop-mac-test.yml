@@ -43,15 +43,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Build unsigned test DMG
+      - name: Build and verify ad-hoc signed test DMG
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           npm run build
           npx electron-builder --config electron-builder.mac-test.config.cjs --mac dmg --${{ matrix.arch }} --publish never
           hdiutil verify out-desktop/*-mac-${{ matrix.arch }}.dmg
+          mount="$RUNNER_TEMP/astrotoo-${{ matrix.arch }}"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" out-desktop/*-mac-${{ matrix.arch }}.dmg
+          trap 'hdiutil detach "$mount" || true' EXIT
+          codesign --verify --deep --strict --verbose=2 "$mount/AstroToo Watchface Editor.app"
       - uses: actions/upload-artifact@v4
         with:
-          name: astrotoo-macos-${{ matrix.arch }}-test
+          name: astrotoo-macos-${{ matrix.arch }}-adhoc-test
           path: out-desktop/*-mac-${{ matrix.arch }}.dmg
           if-no-files-found: error
