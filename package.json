@@ -1,7 +1,10 @@
 {
   "name": "divoom-watchface-visual-editor-astrotoo",
+  "productName": "AstroToo Watchface Editor",
   "version": "0.1.0",
-  "description": "Divoom AstroToo watchface visual editor (480×480, Vite + static templates)",
+  "description": "Divoom AstroToo watchface visual editor (480×480)",
+  "author": "DivoomDevelop",
+  "main": "desktop/main.cjs",
   "private": true,
   "repository": {
     "type": "git",
@@ -17,6 +20,10 @@
     "prebuild": "npm run gen:ai-docs",
     "build": "vite build",
     "preview": "vite preview",
+    "desktop:start": "vite build && electron .",
+    "desktop:make": "vite build && electron-builder --config electron-builder.config.cjs",
+    "desktop:make:win": "vite build && electron-builder --config electron-builder.config.cjs --win nsis --x64",
+    "desktop:make:mac": "vite build && electron-builder --config electron-builder.config.cjs --mac dmg",
     "gen:ai-docs": "node scripts/gen-ai-docs.mjs",
     "sync:disp": "node scripts/sync-disp-from-simulator.mjs",
     "version:bump": "node scripts/bump-version.mjs",
@@ -25,6 +32,8 @@
     "lan:probe": "node scripts/lan-probe.mjs"
   },
   "devDependencies": {
+    "electron": "41.3.0",
+    "electron-builder": "^26.15.3",
     "http-proxy": "^1.18.1",
     "vite": "^6.3.5"
   },

@@ -1,0 +1,35 @@
+name: macOS test installers
+
+on:
+  push:
+    branches: [codex/mac-test-20260924]
+
+permissions:
+  contents: read
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build unsigned test DMG
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm run build
+          npx electron-builder --config electron-builder.mac-test.config.cjs --mac dmg --${{ matrix.arch }}
+          hdiutil verify out-desktop/*-mac-${{ matrix.arch }}.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astrotoo-macos-${{ matrix.arch }}-test
+          path: out-desktop/*-mac-${{ matrix.arch }}.dmg
+          if-no-files-found: error

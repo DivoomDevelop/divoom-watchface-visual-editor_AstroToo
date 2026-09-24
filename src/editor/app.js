@@ -9,6 +9,7 @@ import {
   t
 } from "../i18n/index.js";
 import {
+  initializeWatchfacesStore,
   listWatchfaces,
   upsert,
   removeWatchface,
@@ -5035,7 +5036,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     const nmEn = String(raw?.NameEn || "").trim();
     const rowName = nmCn || nmEn || "立体方块2";
     const bgData = await loadBundledThumbDataUrl(packClock);
-    upsert({
+    await upsert({
       id: BUNDLED_STARTER_WATCHFACE_ID,
       name: rowName,
       updatedAt: Date.now(),
@@ -5171,7 +5172,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         }
         return false;
       }
-      upsert(rec);
+      await upsert(rec);
       if (existing?.localDispAssetStorageKey
         && existing.localDispAssetStorageKey !== localDispAssetStorageKey) {
         void deleteLocalDispAssetRecords(existing.localDispAssetStorageKey).catch(() => {});
@@ -5211,7 +5212,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     refreshToolbarClockIdUi();
     rebuildItemEditor();
     resetLanActionBaselines();
-    await flushPersistActiveWorkspace();
+    const saved = await flushPersistActiveWorkspace();
+    if (!saved) return;
     setLastActiveId(id);
     syncWorkspaceBaseline();
     refreshLocalWatchfaceListUi();
@@ -5944,7 +5946,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (activeLocalWatchfaceId === id) window.clearTimeout(autosaveTimer);
     await persistQueue;
     const rec = getWatchface(id);
-    removeWatchface(id);
+    try {
+      await removeWatchface(id);
+    } catch (e) {
+      alert(t("localWatch.errQuota", { message: errorToText(e) }));
+      return;
+    }
     if (rec?.localDispAssetStorageKey) {
       void deleteLocalDispAssetRecords(rec.localDispAssetStorageKey).catch(() => {});
     }
@@ -6050,7 +6057,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       deviceUploadStates: {}
     };
     try {
-      upsert(rec);
+      await upsert(rec);
     } catch (e) {
       if (localDispAssetStorageKey) {
         void deleteLocalDispAssetRecords(localDispAssetStorageKey).catch(() => {});
@@ -6142,7 +6149,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function resolveSameLanDeviceListUrl() {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV || location.protocol === "astrotoo:") {
       return `${location.origin}/divoom-cloud-proxy/Device/ReturnSameLANDevice`;
     }
     if (location.protocol === "file:") {
@@ -6156,7 +6163,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function shouldUseLanProxyTunnel() {
-    if (import.meta.env.DEV) return true;
+    if (import.meta.env.DEV || location.protocol === "astrotoo:") return true;
     const host = location.hostname;
     if (host === "localhost" || host === "127.0.0.1") return true;
     return location.port === "4173";
@@ -11056,6 +11063,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     rebuildLanguageSelector();
     applyStaticI18n();
     rebuildTemplateClassifyRows();
+    await initializeWatchfacesStore();
 
     bindEvents();
     ensurePreviewStageResizeObserver();
