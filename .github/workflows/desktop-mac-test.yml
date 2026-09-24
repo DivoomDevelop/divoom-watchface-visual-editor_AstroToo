@@ -1,4 +1,4 @@
-name: macOS test installers
+name: Desktop test installers
 
 on:
   push:
@@ -8,6 +8,28 @@ permissions:
   contents: read
 
 jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build unsigned Windows installer
+        shell: pwsh
+        run: |
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astrotoo-windows-x64-test
+          path: out-desktop/*-win-x64-setup.exe
+          if-no-files-found: error
+
   dmg:
     runs-on: macos-latest
     strategy:
