@@ -1,0 +1,48 @@
+name: Inspect macOS test artifact
+
+on:
+  push:
+    branches: [codex/mac-test-20260924]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: astrotoo-macos-arm64-test
+          run-id: 35949426914
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Inspect DMG and app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="incoming/AstroToo-Watchface-Editor-0.1.0-mac-arm64.dmg"
+          echo "Runner architecture: $(uname -m)"
+          shasum -a 256 "$dmg"
+          hdiutil verify "$dmg"
+          mount="$RUNNER_TEMP/astrotoo-inspect"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$dmg"
+          trap 'hdiutil detach "$mount" || true' EXIT
+          app="$mount/AstroToo Watchface Editor.app"
+          test -d "$app"
+          test -f "$app/Contents/Resources/app.asar"
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
+          echo "Bundle executable: $executable"
+          file "$app/Contents/MacOS/$executable"
+          if codesign --verify --deep --strict --verbose=2 "$app"; then
+            echo 'Code signature: valid'
+          else
+            echo 'Code signature: absent or invalid'
+          fi
+          if spctl --assess --type execute --verbose=4 "$app"; then
+            echo 'Gatekeeper: accepted'
+          else
+            echo 'Gatekeeper: rejected'
+          fi
