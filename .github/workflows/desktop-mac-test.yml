@@ -26,7 +26,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           npm run build
-          npx electron-builder --config electron-builder.mac-test.config.cjs --mac dmg --${{ matrix.arch }}
+          npx electron-builder --config electron-builder.mac-test.config.cjs --mac dmg --${{ matrix.arch }} --publish never
           hdiutil verify out-desktop/*-mac-${{ matrix.arch }}.dmg
       - uses: actions/upload-artifact@v4
         with:
