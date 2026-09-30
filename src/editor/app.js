@@ -9,6 +9,7 @@ import {
   t
 } from "../i18n/index.js";
 import {
+  initializeWatchfacesStore,
   listWatchfaces,
   upsert,
   removeWatchface,
@@ -23,7 +24,11 @@ import {
   loadLocalDispAssetRecords,
   deleteLocalDispAssetRecords
 } from "./localDispAssetStore.js";
-import { resolveCdnFetchUrl } from "./cdnAssets.js";
+import { extFromAssetPath, resolveCdnFetchUrl } from "./cdnAssets.js";
+import { animationFrameDurations, animationFrameIndex } from "./backgroundAnimation.js";
+import { imageMimeFromBytes, imageMimeFromDataUrl } from "./imageFormat.js";
+import { packDivoomJpegGifFrames } from "./divoomJpegGif.js";
+import { setTemplateThumbnail, templateThumbnailSources } from "./templateThumbnail.js";
 import {
   DEVICE_JPEG_MAX_BYTES,
   encodeCanvasForAstroToo,
@@ -35,6 +40,7 @@ import {
   normalizeDeviceClockBindings,
   withDeviceClockId
 } from "./deviceClockBindings.js";
+import { deleteWatchfaceRemoteBindings, watchfaceDeletionTargets } from "./watchfaceDeletion.js";
 import {
   encodeAppPreviewWebp,
   getDeviceUploadState,
@@ -51,6 +57,7 @@ import {
 import { APP_BUILD_NUMBER } from "./appVersion.js";
 import { isDevSyncApiAvailable, saveClassifyCacheViaApi, writeDispInfoViaApi, writeFontInfoViaApi } from "./devSyncApi.js";
 import { createDivoomChinaStoreJson } from "./divoomCloudApi.js";
+import { downloadWatchfaceAsset, syncDeviceWatchfaces } from "./deviceWatchfaceSync.js";
 import { buildDivoomLanEnvelope } from "./divoomLanJson.js";
 import {
   downloadSelectedFontsToLocal,
@@ -106,6 +113,8 @@ const EDITOR_CANVAS_HEIGHT = 480;
 
 /** 本地「管理员模式」开关（仅前端展示/后续功能入口；勿作安全边界）。 */
 const ADMIN_UNLOCK_STORAGE_KEY = "divoom_editor_admin_unlocked_v1";
+const EDITOR_USER_MODE_STORAGE_KEY = "divoom_editor_user_mode_v1";
+const USER_CLOCK_NORMAL_APP_TYPE = 33;
 /** 与产品约定一致；仅用于本机浏览器内验证。 */
 const ADMIN_GATE_PASSWORD = "Divoom~!@#";
 
@@ -1149,7 +1158,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   const TEMPLATE_ORGANIZE_REPORT_PATH = withBase("template/organize-report.json");
   const TEMPLATE_CLASSIFY_CACHE_PATH = withBase("template/classify-cache.json");
   const TEMPLATE_BG_EXT_CANDIDATES = [".bin", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
-  const TEMPLATE_PREVIEW_EXT_CANDIDATES = [".png", ".jpg", ".jpeg", ".webp"];
+  const TEMPLATE_PREVIEW_EXT_CANDIDATES = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bin"];
   const TEMPLATE_IMG_EXT_CANDIDATES = [".bin", ".png", ".webp", ".gif", ".jpg", ".jpeg"];
   const TEMPLATE_CLASSIFY_FALLBACK = Object.freeze({
     ReturnCode: 0,
@@ -1685,18 +1694,14 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     return "-";
   }
 
-  /**
-   * 由 MIME 推断栅格资源类别（与文件名后缀无关）。
-   * `localPick: true` 时仅限用户本机选用的 JPG / WEBP / GIF / DIVM（与设备常用下发格式一致）。
-   */
-  function inferRasterFormatFromMime(mimeType, opts = {}) {
-    const localPick = opts.localPick === true;
+  /** 文件头识别出的 MIME 对应解码类型；本机选图同样支持 PNG。 */
+  function inferRasterFormatFromMime(mimeType) {
     const m = String(mimeType || "").split(";")[0].trim().toLowerCase();
     if (m === DIVOOM_JPEG_GIF_MIME) return "jpeg_gif";
     if (m === "image/gif") return "gif";
     if (m === "image/webp") return "webp";
     if (m === "image/jpeg" || m === "image/jpg") return "jpeg";
-    if (!localPick && m === "image/png") return "png";
+    if (m === "image/png") return "png";
     return "";
   }
 
@@ -1790,32 +1795,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     return anmfCount > 0 ? anmfCount : 1;
   }
 
-  function inferImageMimeFromBuffer(buf, fileName = "", mimeHint = "") {
-    const bytes = new Uint8Array(buf);
-    if (isDivoomJpegGifBytes(bytes)) return DIVOOM_JPEG_GIF_MIME;
-    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-    if (
-      bytes.length >= 8 &&
-      bytes[0] === 0x89 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x4e &&
-      bytes[3] === 0x47 &&
-      bytes[4] === 0x0d &&
-      bytes[5] === 0x0a &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0x0a
-    ) {
-      return "image/png";
-    }
-    const sig6 = bytes.length >= 6 ? readAscii(bytes, 0, 6) : "";
-    if (sig6 === "GIF87a" || sig6 === "GIF89a") return "image/gif";
-    if (bytes.length >= 12 && readAscii(bytes, 0, 4) === "RIFF" && readAscii(bytes, 8, 4) === "WEBP") return "image/webp";
-    if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return "image/bmp";
-
-    const mime = String(mimeHint || "").split(";")[0].trim().toLowerCase();
-    if (mime.startsWith("image/")) return mime;
-
-    return "application/octet-stream";
+  function inferImageMimeFromBuffer(buf) {
+    return imageMimeFromBytes(buf);
   }
 
   function parseDivoomJpegGifContainer(buf) {
@@ -1927,6 +1908,32 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (size <= LOCAL_FILE_PICK_MAX_BYTES) return false;
     alert(t("alert.localFileTooLarge"));
     return true;
+  }
+
+  async function loadLocalAssetFromFiles(files) {
+    if (files.length === 1) return loadLocalAssetFromFile(files[0]);
+    const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const frames = [];
+    let dimensions = "";
+    for (const file of sorted) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (inferImageMimeFromBuffer(bytes, file.name, "") !== "image/jpeg") {
+        throw new Error(t("editor.asset.multiJpegOnly"));
+      }
+      const url = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+      try {
+        const image = await loadImageByObjectUrl(url);
+        const current = `${image.naturalWidth}×${image.naturalHeight}`;
+        if (dimensions && current !== dimensions) throw new Error(t("editor.asset.frameSizeMismatch"));
+        dimensions = current;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      frames.push(await encodeBytesToJpegForBundle(bytes, "image/jpeg"));
+    }
+    const packed = packDivoomJpegGifFrames(frames, PREVIEW_TICK_MS);
+    const name = `${stripExt(sorted[0].name)}-${sorted.length}frames.bin`;
+    return loadLocalAssetFromFile(new File([packed], name, { type: DIVOOM_JPEG_GIF_MIME }));
   }
 
   async function loadLocalAssetFromFile(file) {
@@ -2151,19 +2158,22 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     const type = String(mimeType || "").toLowerCase();
     if (!type.includes("gif") && !type.includes("webp")) return [];
     let decoder = null;
+    const frames = [];
     try {
       decoder = new ImageDecoder({ data: buf, type: mimeType });
       await decoder.tracks.ready;
       const track = decoder.tracks.selectedTrack;
       const frameCount = Math.max(1, toNum(track?.frameCount, 1));
       if (frameCount <= 1 || frameCount > 240) return [];
-      const frames = [];
       for (let i = 0; i < frameCount; i++) {
         const result = await decoder.decode({ frameIndex: i });
         if (result?.image) frames.push(result.image);
       }
       return frames;
     } catch (e) {
+      for (const frame of frames) {
+        try { frame.close(); } catch { /* ignore */ }
+      }
       return [];
     } finally {
       if (decoder) {
@@ -2464,6 +2474,9 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (!state.config || typeof state.config !== "object") return;
     if (dom.txtDescCn) dom.txtDescCn.value = String(state.config.DescCn ?? "");
     if (dom.txtDescEn) dom.txtDescEn.value = String(state.config.DescEn ?? "");
+    if (dom.txtDescUser) dom.txtDescUser.value = String(state.config.DescCn || state.config.DescEn || "");
+    if (dom.txtRequestUrl) dom.txtRequestUrl.value = String(state.config.RequestUrlAddr ?? "");
+    if (dom.txtRequestTime) dom.txtRequestTime.value = state.config.RequestTime == null ? "" : String(state.config.RequestTime);
   }
 
   function fontBaseFromCfgPath(cfgPath) {
@@ -3126,6 +3139,14 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     appPreviewRequirement: byId("app-preview-requirement"),
     lblDescCn: byId("lbl-desc-cn"),
     lblDescEn: byId("lbl-desc-en"),
+    lblDescUser: byId("lbl-desc-user"),
+    lblRequestUrl: byId("lbl-request-url"),
+    lblRequestTime: byId("lbl-request-time"),
+    btnRequestHelp: byId("btn-request-help"),
+    descCnRow: byId("desc-cn-row"),
+    descEnRow: byId("desc-en-row"),
+    descUserRow: byId("desc-user-row"),
+    userRequestFields: byId("user-request-fields"),
     lblCurrentClock: byId("lbl-current-clock"),
     lblClockId: byId("lbl-clock-id"),
     lblItemCount: byId("lbl-item-count"),
@@ -3148,6 +3169,9 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     btnClearAppPreview: byId("btn-clear-app-preview"),
     txtDescCn: byId("txt-desc-cn"),
     txtDescEn: byId("txt-desc-en"),
+    txtDescUser: byId("txt-desc-user"),
+    txtRequestUrl: byId("txt-request-url"),
+    txtRequestTime: byId("txt-request-time"),
     btnLanShowCurrentClockOnDevice: byId("btn-lan-show-current-clock"),
     btnLanCreateOnDevice: byId("btn-lan-create-on-device"),
     btnLanShareWatchface: byId("btn-lan-share-watchface"),
@@ -3229,6 +3253,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     aboutIntro: byId("about-intro"),
     aboutDblhint: byId("about-dblhint"),
     aboutVersionLine: byId("about-version-line"),
+    aboutModeLabel: byId("about-mode-label"),
+    aboutModeToggle: byId("about-mode-toggle"),
     aboutDoubleclickZone: byId("about-doubleclick-zone"),
     aboutClose: byId("about-close"),
     aboutAdminExit: byId("about-admin-exit"),
@@ -3287,6 +3313,10 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     selectedIndex: -1,
     previewTextOverrides: new Map(),
     backgroundImage: null,
+    backgroundFrames: [],
+    backgroundFrameObjectUrls: [],
+    backgroundFrameDurations: [],
+    backgroundAnimationStartedAt: 0,
     backgroundName: "",
     backgroundObjectUrl: "",
     /** 模板底图等：只读框展示的绝对 URL 或本地上传说明（浏览器无法取得真实磁盘路径） */
@@ -3322,6 +3352,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   let lanSyncBusy = false;
   let lanReviewRequestToken = 0;
   const localWatchClockStatusByDevice = new Map();
+  const deviceWatchfaceSyncInFlight = new Map();
   let localWatchStatusRequestSeq = 0;
   let lanReviewView = {
     phase: "idle", deviceId: 0, clockId: 0, records: [], error: "",
@@ -3425,25 +3456,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
   function clearLocalDispAsset(item) {
     if (!item) return;
-    const old = localDispAssets.get(item);
-    if (Array.isArray(old?.frames)) {
-      for (const frame of old.frames) {
-        if (frame && typeof frame.close === "function") {
-          try {
-            frame.close();
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-    }
-    if (old?.objectUrl) {
-      try {
-        URL.revokeObjectURL(old.objectUrl);
-      } catch (e) {
-        // ignore
-      }
-    }
+    releaseStandaloneAsset(localDispAssets.get(item));
     localDispAssets.delete(item);
   }
 
@@ -3455,34 +3468,26 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
   function clearAllLocalDispAssets() {
     for (const asset of localDispAssets.values()) {
-      if (Array.isArray(asset?.frames)) {
-        for (const frame of asset.frames) {
-          if (frame && typeof frame.close === "function") {
-            try {
-              frame.close();
-            } catch (e) {
-              // ignore
-            }
-          }
-        }
-      }
-      if (asset?.objectUrl) {
-        try {
-          URL.revokeObjectURL(asset.objectUrl);
-        } catch (e) {
-          // ignore
-        }
-      }
+      releaseStandaloneAsset(asset);
     }
     localDispAssets.clear();
   }
 
   function clearBackgroundObjectUrl() {
-    if (!state.backgroundObjectUrl) return;
-    try {
-      URL.revokeObjectURL(state.backgroundObjectUrl);
-    } catch (e) {
-      // ignore
+    for (const frame of state.backgroundFrames) {
+      if (typeof frame?.close === "function") {
+        try { frame.close(); } catch { /* ignore */ }
+      }
+    }
+    for (const url of state.backgroundFrameObjectUrls) {
+      try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+    }
+    state.backgroundFrames = [];
+    state.backgroundFrameObjectUrls = [];
+    state.backgroundFrameDurations = [];
+    state.backgroundAnimationStartedAt = 0;
+    if (state.backgroundObjectUrl) {
+      try { URL.revokeObjectURL(state.backgroundObjectUrl); } catch { /* ignore */ }
     }
     state.backgroundObjectUrl = "";
   }
@@ -3495,6 +3500,13 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       return;
     }
     state.backgroundImage = asset.image;
+    state.backgroundFrames = Array.isArray(asset.frames) && asset.frames.length > 1 ? asset.frames : [];
+    state.backgroundFrameObjectUrls = Array.isArray(asset.frameObjectUrls) ? asset.frameObjectUrls : [];
+    state.backgroundFrameDurations = animationFrameDurations(
+      state.backgroundFrames,
+      Math.max(10, Number(asset.frameDelayMs) || PREVIEW_TICK_MS)
+    );
+    state.backgroundAnimationStartedAt = performance.now();
     state.backgroundName = asset.name || "";
     state.backgroundObjectUrl = String(asset.objectUrl || "");
   }
@@ -3702,6 +3714,28 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     }
   }
 
+  function isUserMode() {
+    try {
+      return localStorage.getItem(EDITOR_USER_MODE_STORAGE_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  }
+
+  function syncEditorModeUi() {
+    const userMode = isUserMode();
+    if (dom.descCnRow) dom.descCnRow.hidden = userMode;
+    if (dom.descEnRow) dom.descEnRow.hidden = userMode;
+    if (dom.descUserRow) dom.descUserRow.hidden = !userMode;
+    if (dom.userRequestFields) dom.userRequestFields.hidden = !userMode;
+    if (dom.aboutModeLabel) setNodeText(dom.aboutModeLabel, t(userMode ? "about.mode.user" : "about.mode.production"));
+    if (dom.aboutModeToggle) {
+      setNodeText(dom.aboutModeToggle, t(userMode ? "about.mode.switchProduction" : "about.mode.switchUser"));
+      dom.aboutModeToggle.setAttribute("aria-pressed", String(userMode));
+    }
+    refreshWatchDescFields();
+  }
+
   function configureAdminGateDialog(openUnlockedVariant) {
     if (!dom.adminPasswordDialog) return;
     const unlocked = Boolean(openUnlockedVariant);
@@ -3751,6 +3785,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       dom.aboutDoubleclickZone.setAttribute("aria-label", t("about.dblAria"));
     if (dom.btnAbout) setNodeText(dom.btnAbout, t("about.open"));
     if (dom.aboutClose) setNodeText(dom.aboutClose, t("about.close"));
+    syncEditorModeUi();
     syncAdminUnlockUi();
     configureAdminGateDialog(readAdminUnlockFromStorage());
   }
@@ -3763,6 +3798,14 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       });
     }
     if (dom.aboutClose && dom.aboutDialog) dom.aboutClose.addEventListener("click", () => dom.aboutDialog.close());
+    dom.aboutModeToggle?.addEventListener("click", () => {
+      try {
+        localStorage.setItem(EDITOR_USER_MODE_STORAGE_KEY, isUserMode() ? "0" : "1");
+      } catch {
+        return;
+      }
+      syncEditorModeUi();
+    });
     if (dom.aboutAdminExit) {
       dom.aboutAdminExit.addEventListener("click", () => {
         persistAdminUnlock(false);
@@ -3879,6 +3922,10 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (dom.secWatchDescTitle) setNodeText(dom.secWatchDescTitle, t("ui.sec.watchDesc"));
     if (dom.lblDescCn) setNodeText(dom.lblDescCn, t("ui.label.descCn"));
     if (dom.lblDescEn) setNodeText(dom.lblDescEn, t("ui.label.descEn"));
+    if (dom.lblDescUser) setNodeText(dom.lblDescUser, t("ui.label.descUser"));
+    if (dom.lblRequestUrl) setNodeText(dom.lblRequestUrl, t("ui.label.requestUrl"));
+    if (dom.lblRequestTime) setNodeText(dom.lblRequestTime, t("ui.label.requestTime"));
+    if (dom.btnRequestHelp) setNodeText(dom.btnRequestHelp, t("ui.btn.requestHelp"));
     setNodeText(dom.secItemlistTitle, t("ui.sec.items"));
     setNodeText(dom.secEditorTitle, t("ui.sec.editor"));
 
@@ -4064,6 +4111,13 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       ItemList: itemList,
       ItemIdList: itemIdList
     };
+    const customApp = Array.isArray(base.AppList)
+      ? base.AppList.find((app) => Number(app?.DivoomAppType) === USER_CLOCK_NORMAL_APP_TYPE)
+      : null;
+    if (merged.RequestUrlAddr === undefined && customApp?.UrlInfo)
+      merged.RequestUrlAddr = String(customApp.UrlInfo);
+    if (merged.RequestTime === undefined && customApp?.UpdateTime != null)
+      merged.RequestTime = toNum(customApp.UpdateTime, 1800);
     if (tplAsset > 0) merged.TemplateAssetClockId = tplAsset;
     else delete merged.TemplateAssetClockId;
     if (merged.AppImageUrl === undefined && merged.AppPreviewImageUrl !== undefined) {
@@ -4071,6 +4125,46 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     }
     delete merged.AppPreviewImageUrl;
     return merged;
+  }
+
+  function syncUserRequestAppConfig() {
+    const config = state.config;
+    if (!config || typeof config !== "object") return;
+    const url = String(config.RequestUrlAddr || "").trim();
+    const apps = Array.isArray(config.AppList) ? [...config.AppList] : [];
+    const index = apps.findIndex((app) => Number(app?.DivoomAppType) === USER_CLOCK_NORMAL_APP_TYPE);
+    if (!url) {
+      if (index < 0) return;
+      apps.splice(index, 1);
+      if (apps.length) {
+        config.AppList = apps;
+        config.AppNum = apps.length;
+      } else {
+        delete config.AppList;
+        delete config.AppNum;
+      }
+      return;
+    }
+    const seconds = Number.isSafeInteger(Number(config.RequestTime)) && Number(config.RequestTime) >= 10
+      ? Number(config.RequestTime) : 1800;
+    config.RequestTime = seconds;
+    const app = {
+      ...(index >= 0 ? apps[index] : {}),
+      AppID: index >= 0 ? apps[index].AppID
+        : Math.max(0, ...apps.map((entry) => toNum(entry?.AppID, 0))) + 1,
+      DivoomAppType: USER_CLOCK_NORMAL_APP_TYPE,
+      UrlInfo: url,
+      UpdateTime: seconds,
+      Config: index >= 0 ? apps[index].Config || "" : "",
+      UrlHead: index >= 0 ? apps[index].UrlHead || [] : [],
+      AppName: index >= 0 ? apps[index].AppName || "No Select" : "No Select",
+      AppTitle: index >= 0 ? apps[index].AppTitle || "" : "",
+      DispData: index >= 0 ? apps[index].DispData || [] : []
+    };
+    if (index >= 0) apps[index] = app;
+    else apps.push(app);
+    config.AppList = apps;
+    config.AppNum = apps.length;
   }
 
   /** 解析 template/15、template/29 等资源包用的 ClockId：`ClockId` 为设备/未下发 0 时仍用复制的模板锚点加载内置文件。 */
@@ -4231,7 +4325,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
           img.alt = "";
           img.decoding = "async";
           img.loading = "lazy";
-          img.src = `${TEMPLATE_PREVIEW_DIR_33}${firstId + 1}.png`;
+          setTemplateThumbnail(img, templateThumbnailSourcesForId(firstId));
           btn.appendChild(img);
         }
 
@@ -4288,8 +4382,29 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     return {
       NameCn: String(raw?.NameCn ?? "").trim(),
       NameEn: String(raw?.NameEn ?? "").trim(),
+      AppImageUrl: String(raw?.AppImageUrl ?? "").trim(),
       ClockId: toNum(raw?.ClockId, fallbackId)
     };
+  }
+
+  function isCloudImageAddress(value) {
+    return /^https?:\/\//i.test(value) || /^\/?group\d+\//i.test(value);
+  }
+
+  function templateAppImageUrl(id) {
+    return String(templateState.metaById.get(id)?.AppImageUrl || "").trim();
+  }
+
+  function templateThumbnailSourcesForId(id) {
+    const appImageUrl = templateAppImageUrl(id);
+    return templateThumbnailSources(id, {
+      previewDir: TEMPLATE_PREVIEW_DIR_33,
+      backgroundDir: TEMPLATE_DIR_15,
+      appImageUrl,
+      remoteUrl: isCloudImageAddress(appImageUrl)
+        ? resolveCdnFetchUrl(appImageUrl, { useProxy: true, origin: location.origin }) : "",
+      remoteFirst: true
+    });
   }
 
   function getTemplateListItemName(id) {
@@ -4401,6 +4516,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     return JSON.stringify({
       device: getLanDeviceSnapshot(),
       name: resolveLanDeviceCreateClockName(),
+      desc: String(state.config?.DescCn || state.config?.DescEn || ""),
       appPreview: lanAssetKey(state.appPreviewImage)
     });
   }
@@ -4583,7 +4699,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       : t("lan.review.clockStatus.unknown", { status: Number.isFinite(status) ? status : "-" });
   }
 
-  async function refreshLocalWatchfaceStatusForDevice({ force = false } = {}) {
+  async function refreshLocalWatchfaceStatusForDevice({ force = false, clockInfo = null } = {}) {
     const deviceId = resolveClockBindingDeviceId();
     if (deviceId <= 0) {
       refreshLocalWatchfaceListUi();
@@ -4595,7 +4711,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     localWatchClockStatusByDevice.set(deviceId, { phase: "loading", seq, statuses: cached?.statuses || new Map() });
     refreshLocalWatchfaceListUi();
     try {
-      const data = await divoomStoreJson("Channel/GetDeviceClockInfo", { DeviceId: deviceId });
+      const data = clockInfo || await divoomStoreJson("Channel/GetDeviceClockInfo", { DeviceId: deviceId });
       if (!Array.isArray(data?.ClockList)) throw new Error(t("lan.review.invalidStatusResponse"));
       const statuses = new Map(data.ClockList
         .filter((row) => Number(row?.ClockId) > 0)
@@ -4607,6 +4723,41 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       localWatchClockStatusByDevice.set(deviceId, { phase: "error", seq, error: errorToText(error) });
     }
     if (resolveClockBindingDeviceId() === deviceId) refreshLocalWatchfaceListUi();
+  }
+
+  async function syncSelectedDeviceWatchfaces() {
+    const deviceId = toNum(resolveSelectedLanDeviceId(), 0);
+    if (deviceId <= 0) return;
+    if (deviceWatchfaceSyncInFlight.has(deviceId)) return deviceWatchfaceSyncInFlight.get(deviceId);
+    const work = (async () => {
+      try {
+        const result = await syncDeviceWatchfaces({
+          deviceId,
+          storeJson: divoomStoreJson,
+          list: listWatchfaces,
+          save: upsert,
+          loadAsset: (path) => downloadWatchfaceAsset(path, location.origin)
+        });
+        if (result.imported && resolveSelectedLanDeviceId() === deviceId) refreshLocalWatchfaceListUi();
+        for (const { clockId, error } of result.errors) {
+          fontStore.log(`Clock ${clockId}: ${errorToText(error)}`);
+        }
+        if (resolveSelectedLanDeviceId() === deviceId) {
+          void refreshLocalWatchfaceStatusForDevice({ force: true, clockInfo: result.clockInfo });
+        }
+      } catch (error) {
+        fontStore.log(errorToText(error));
+        if (resolveSelectedLanDeviceId() === deviceId) {
+          void refreshLocalWatchfaceStatusForDevice({ force: true });
+        }
+      }
+    })();
+    deviceWatchfaceSyncInFlight.set(deviceId, work);
+    try {
+      await work;
+    } finally {
+      if (deviceWatchfaceSyncInFlight.get(deviceId) === work) deviceWatchfaceSyncInFlight.delete(deviceId);
+    }
   }
 
   function localWatchfaceStatus(deviceId, clockId) {
@@ -4918,12 +5069,32 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     }
   }
 
-  async function imageToDataUrlForPersist(img) {
-    if (!img || !img.complete || img.naturalWidth <= 0) return null;
+  async function imageToDataUrlForPersist(img, sourceOverride = "") {
+    const source = String(sourceOverride || img?.src || "");
+    if (source.startsWith("data:")) return source;
+    if (source.startsWith("blob:")) {
+      try {
+        const response = await fetch(source);
+        if (response.ok) {
+          const blob = await response.blob();
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(reader.error || new Error("image read failed"));
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch {
+        // Fall back to a still image if the original bytes are unavailable.
+      }
+    }
+    const width = img?.naturalWidth || img?.displayWidth || img?.width || 0;
+    const height = img?.naturalHeight || img?.displayHeight || img?.height || 0;
+    if (!width || !height) return null;
     try {
       const c = document.createElement("canvas");
-      c.width = img.naturalWidth;
-      c.height = img.naturalHeight;
+      c.width = width;
+      c.height = height;
       const ctx = c.getContext("2d");
       ctx.drawImage(img, 0, 0);
       return c.toDataURL("image/jpeg", 0.9);
@@ -4949,10 +5120,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     return dataUrl;
   }
 
-  function persistImageCacheKey(img, name) {
-    if (!img || !img.complete || img.naturalWidth <= 0) return "";
-    const src = String(img.src || "");
-    return `${name || ""}|${img.naturalWidth}x${img.naturalHeight}|${src.length}|${src.slice(-64)}`;
+  function persistImageCacheKey(img, name, sourceOverride = "") {
+    const src = String(sourceOverride || img?.src || "");
+    const width = img?.naturalWidth || img?.displayWidth || img?.width || 0;
+    const height = img?.naturalHeight || img?.displayHeight || img?.height || 0;
+    if (!src && (!width || !height)) return "";
+    return `${name || ""}|${width}x${height}|${src.length}|${src.slice(-64)}`;
   }
 
   function invalidatePersistImageCache(slot) {
@@ -4964,12 +5137,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     persistImageCache.appPreview = { key: "", dataUrl: null };
   }
 
-  async function cachedImageDataUrlForPersist(slot, img, name) {
-    const key = persistImageCacheKey(img, name);
+  async function cachedImageDataUrlForPersist(slot, img, name, sourceOverride = "") {
+    const key = persistImageCacheKey(img, name, sourceOverride);
     if (!key) return null;
     const entry = persistImageCache[slot];
     if (entry.key === key && entry.dataUrl) return entry.dataUrl;
-    const dataUrl = await imageToDataUrlForPersist(img);
+    const dataUrl = await imageToDataUrlForPersist(img, sourceOverride);
     persistImageCache[slot] = { key, dataUrl };
     return dataUrl;
   }
@@ -5035,7 +5208,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     const nmEn = String(raw?.NameEn || "").trim();
     const rowName = nmCn || nmEn || "立体方块2";
     const bgData = await loadBundledThumbDataUrl(packClock);
-    upsert({
+    await upsert({
       id: BUNDLED_STARTER_WATCHFACE_ID,
       name: rowName,
       updatedAt: Date.now(),
@@ -5085,6 +5258,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       config: JSON.parse(JSON.stringify(state.config)),
       itemAssets: state.config.ItemList.map((item) => getLocalDispAsset(item)),
       backgroundImage: state.backgroundImage,
+      backgroundObjectUrl: state.backgroundObjectUrl,
       backgroundName: state.backgroundName || "",
       backgroundSourceLabel: state.backgroundSourceLabel || "",
       appPreviewImage: state.appPreviewImage,
@@ -5108,7 +5282,9 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       unboundLegacyClockId: activeUnboundLegacyClockId
     };
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    const bgUrl = await cachedImageDataUrlForPersist("bg", workspace.backgroundImage, workspace.backgroundName);
+    const bgUrl = await cachedImageDataUrlForPersist(
+      "bg", workspace.backgroundImage, workspace.backgroundName, workspace.backgroundObjectUrl
+    );
     const appPreviewUrl = await cachedImageDataUrlForPersist(
       "appPreview",
       workspace.appPreviewImage,
@@ -5141,6 +5317,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     }
     const rec = {
       id: watchfaceId,
+      source: existing?.source || "",
       name: nm,
       updatedAt: Date.now(),
       config: workspace.config,
@@ -5171,7 +5348,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         }
         return false;
       }
-      upsert(rec);
+      await upsert(rec);
       if (existing?.localDispAssetStorageKey
         && existing.localDispAssetStorageKey !== localDispAssetStorageKey) {
         void deleteLocalDispAssetRecords(existing.localDispAssetStorageKey).catch(() => {});
@@ -5211,7 +5388,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     refreshToolbarClockIdUi();
     rebuildItemEditor();
     resetLanActionBaselines();
-    await flushPersistActiveWorkspace();
+    const saved = await flushPersistActiveWorkspace();
+    if (!saved) return;
     setLastActiveId(id);
     syncWorkspaceBaseline();
     refreshLocalWatchfaceListUi();
@@ -5675,12 +5853,21 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       main.className = "local-watch-row-main";
       const thumb = document.createElement("span");
       thumb.className = "local-watch-thumb";
-      const thumbSrc = row.appPreviewDataUrl || row.backgroundDataUrl || "";
-      if (thumbSrc) {
+      const packId = toNum(row.config?.TemplateAssetClockId, 0) || toNum(row.templateActiveClockId, 0);
+      const storedAppUrl = String(row.config?.AppImageUrl || "").trim();
+      const appImageUrl = templateAppImageUrl(packId) ||
+        (isCloudImageAddress(storedAppUrl) ? storedAppUrl : "");
+      const appExt = extFromAssetPath(appImageUrl);
+      const appLocal = packId > 0 && appImageUrl && TEMPLATE_PREVIEW_EXT_CANDIDATES.includes(appExt)
+        ? `${TEMPLATE_PREVIEW_DIR_33}${packId + 1}.app${appExt}` : "";
+      const appRemote = isCloudImageAddress(appImageUrl)
+        ? resolveCdnFetchUrl(appImageUrl, { useProxy: true, origin: location.origin }) : "";
+      const thumbSources = [appLocal, appRemote, row.appPreviewDataUrl, row.backgroundDataUrl].filter(Boolean);
+      if (thumbSources.length) {
         const img = document.createElement("img");
-        img.src = thumbSrc;
         img.alt = "";
         img.loading = "lazy";
+        setTemplateThumbnail(img, thumbSources);
         thumb.appendChild(img);
       } else {
         thumb.textContent = "480 × 480";
@@ -5711,7 +5898,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         meta.appendChild(date);
       }
       main.append(thumb, meta);
+      const isShared = row.source === "deviceCloud" ||
+        Boolean(getDeviceUploadState(normalizeDeviceUploadStates(row), deviceId, clockIdOnRecord)) ||
+        ["private", "waitingUser", "waitingAdmin", "approved", "rejected"].includes(status.key);
       main.addEventListener("click", () => {
+        if (lanSyncBusy || lanShareBusy) return;
+        if (clockIdOnRecord > 0 && isShared) void selectLocalWatchfaceOnDevice(clockIdOnRecord);
         void loadLocalWatchfaceById(row.id);
       });
       const actions = document.createElement("div");
@@ -5761,7 +5953,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     const restoredConfig = JSON.parse(JSON.stringify(rec.config || {}));
     restoredConfig.ClockId = getDeviceClockId(activeDeviceClockIds, deviceId);
     applyConfig(restoredConfig, t("localWatch.loaded", { name: rec.name }));
-    let packId = resolveTemplate29PackClockId(state.config);
+    let packId = rec.source === "deviceCloud" ? 0 : resolveTemplate29PackClockId(state.config);
     if (packId <= 0 && rec.templateActiveClockId != null) {
       const fid = toNum(rec.templateActiveClockId, 0);
       if (fid > 0) {
@@ -5778,28 +5970,30 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       rec.templateActiveClockId != null ? rec.templateActiveClockId : null;
     refreshTemplateListUi();
 
-    if (rec.backgroundDataUrl) {
+    let restoredBackground = false;
+    if (imageMimeFromDataUrl(rec.backgroundDataUrl) === "image/jpeg") {
+      const recovered = await loadAnimatedTemplateBackgroundForLegacyRecord(rec, packId);
+      if (recovered?.asset) {
+        setBackgroundFromAsset(recovered.asset);
+        restoreLanAssetKey(state.backgroundImage, rec.backgroundAssetKey);
+        state.backgroundName = rec.backgroundName || recovered.asset.name;
+        state.backgroundSourceLabel = absoluteUrlFromResolvedPath(recovered.path);
+        restoredBackground = true;
+      }
+    }
+    if (!restoredBackground && rec.backgroundDataUrl) {
       try {
-        await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            clearBackgroundObjectUrl();
-            restoreLanAssetKey(img, rec.backgroundAssetKey);
-            state.backgroundImage = img;
-            state.backgroundName = rec.backgroundName || "";
-            state.backgroundSourceLabel = rec.backgroundSourceLabel || "";
-            resolve();
-          };
-          img.onerror = () => reject(new Error("bg"));
-          img.src = rec.backgroundDataUrl;
-        });
+        const asset = await loadLocalAssetFromUrl(rec.backgroundDataUrl, rec.backgroundName || "background");
+        setBackgroundFromAsset(asset);
+        restoreLanAssetKey(state.backgroundImage, rec.backgroundAssetKey);
+        state.backgroundSourceLabel = rec.backgroundSourceLabel || "";
       } catch {
         clearBackgroundObjectUrl();
         state.backgroundImage = null;
         state.backgroundName = "";
         state.backgroundSourceLabel = "";
       }
-    } else {
+    } else if (!restoredBackground) {
       clearBackgroundObjectUrl();
       state.backgroundImage = null;
       state.backgroundName = "";
@@ -5816,6 +6010,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
             if (!dimensions.ok) {
               dom.inputAppPreviewFile.value = "";
               alert(t("lan.upload.previewDimensions", dimensions));
+              reject(new Error("Invalid APP preview dimensions"));
               return;
             }
             clearAppPreviewObjectUrl();
@@ -5860,12 +6055,15 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         }
       }
       if (!rec.appPreviewDataUrl && !state.appPreviewImage) {
-        const previewResult = await loadTemplateAppPreviewByClockId(packId);
+        const previewResult = await loadTemplateAppPreviewByClockId(
+          packId, templateAppImageUrl(packId) || state.config?.AppImageUrl
+        );
         if (token === templateState.loadToken && previewResult?.asset) {
           setAppPreviewFromAsset(previewResult.asset);
           const rel = String(previewResult.path || "").trim();
           state.appPreviewSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
-          if (state.config && typeof state.config === "object") {
+          if (state.config && typeof state.config === "object" &&
+              !isCloudImageAddress(String(state.config.AppImageUrl || ""))) {
             state.config.AppImageUrl = previewResult.asset.name || `${packId + 1}.png`;
           }
           refreshAppPreviewSourceLabel();
@@ -5935,16 +6133,84 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     await restoreWorkspaceFromRecord(rec);
     namingPromptDismissed = true;
     refreshLocalWatchfaceListUi();
-    await selectLocalWatchfaceOnDevice(state.config?.ClockId);
+  }
+
+  let localWatchDeleteBusy = false;
+
+  function watchfaceDeleteTargetBase(deviceId) {
+    const row = lanDeviceRowsById.get(String(deviceId));
+    const ip = String(row?.DevicePrivateIP || "").trim();
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(ip)) return `http://${ip}:${LAN_DEVICE_HTTP_PORT}`;
+    if (resolveSelectedLanDeviceId() === deviceId && hasLanDeviceHttpTarget()) {
+      return getLanTargetBase().replace(/\/$/, "");
+    }
+    throw new Error(t("localWatch.deleteDeviceUnavailable", { deviceId }));
+  }
+
+  async function deleteWatchfaceOnDevice(deviceId, clockId, base) {
+    const useProxy = shouldUseLanProxyTunnel();
+    const url = useProxy ? "/divoom-proxy/divoom_api" : `${base}/divoom_api`;
+    const headers = new Headers({ "Content-Type": "application/json;charset=UTF-8" });
+    if (useProxy) headers.set("X-Divoom-Lan-Target", base);
+    const envelope = buildDivoomLanEnvelope("Device/DeleteLocalClock", { ClockId: clockId }, () => deviceId);
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(envelope) });
+    const body = await response.text();
+    let data;
+    try { data = JSON.parse(body); } catch { /* reported below */ }
+    if (!response.ok || !data || Number(data.ReturnCode) !== 0 || Number(data.ClockId) !== clockId) {
+      throw new Error(String(data?.ReturnMessage || body.slice(0, 240) || `HTTP ${response.status}`));
+    }
+    return data;
   }
 
   async function deleteLocalWatchface(id) {
-    if (!id) return;
-    if (!confirm(t("localWatch.confirmDelete"))) return;
-    if (activeLocalWatchfaceId === id) window.clearTimeout(autosaveTimer);
+    if (!id || localWatchDeleteBusy || lanSyncBusy || lanShareBusy) return;
     await persistQueue;
     const rec = getWatchface(id);
-    removeWatchface(id);
+    if (!rec) return;
+    const selectedDeviceId = resolveClockBindingDeviceId();
+    let targets;
+    try {
+      targets = watchfaceDeletionTargets(rec, selectedDeviceId);
+    } catch {
+      alert(t("localWatch.deleteSelectDevice"));
+      return;
+    }
+    const confirmed = confirm(t(targets.length
+      ? "localWatch.confirmDeleteRemote" : "localWatch.confirmDelete", { name: rec.name || id, count: targets.length }));
+    if (!confirmed) return;
+    const targetBases = new Map();
+    try {
+      for (const target of targets) {
+        targetBases.set(target.deviceId, watchfaceDeleteTargetBase(target.deviceId));
+      }
+    } catch (error) {
+      alert(errorToText(error));
+      return;
+    }
+    localWatchDeleteBusy = true;
+    if (activeLocalWatchfaceId === id) window.clearTimeout(autosaveTimer);
+    try {
+      await deleteWatchfaceRemoteBindings(rec, targets, {
+        deleteServer: (deviceId, clockId) =>
+          createDivoomChinaStoreJson(() => deviceId)("Channel/DelDeviceClockInfo", { ClockId: clockId }),
+        deleteDevice: (deviceId, clockId) =>
+          deleteWatchfaceOnDevice(deviceId, clockId, targetBases.get(deviceId)),
+        saveProgress: upsert
+      });
+    } catch (error) {
+      alert(t("localWatch.deleteRemoteFailed", { message: errorToText(error) }));
+      refreshLocalWatchfaceListUi();
+      localWatchDeleteBusy = false;
+      return;
+    }
+    try {
+      await removeWatchface(id);
+    } catch (e) {
+      alert(t("localWatch.errQuota", { message: errorToText(e) }));
+      localWatchDeleteBusy = false;
+      return;
+    }
     if (rec?.localDispAssetStorageKey) {
       void deleteLocalDispAssetRecords(rec.localDispAssetStorageKey).catch(() => {});
     }
@@ -5976,6 +6242,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       syncWorkspaceBaseline();
     }
     refreshLocalWatchfaceListUi();
+    localWatchDeleteBusy = false;
   }
 
   async function duplicateLocalWatchfaceFromRow(sourceId) {
@@ -6050,7 +6317,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       deviceUploadStates: {}
     };
     try {
-      upsert(rec);
+      await upsert(rec);
     } catch (e) {
       if (localDispAssetStorageKey) {
         void deleteLocalDispAssetRecords(localDispAssetStorageKey).catch(() => {});
@@ -6142,7 +6409,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function resolveSameLanDeviceListUrl() {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV || location.protocol === "astrotoo:") {
       return `${location.origin}/divoom-cloud-proxy/Device/ReturnSameLANDevice`;
     }
     if (location.protocol === "file:") {
@@ -6156,7 +6423,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function shouldUseLanProxyTunnel() {
-    if (import.meta.env.DEV) return true;
+    if (import.meta.env.DEV || location.protocol === "astrotoo:") return true;
     const host = location.hostname;
     if (host === "localhost" || host === "127.0.0.1") return true;
     return location.port === "4173";
@@ -6577,14 +6844,14 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       img.alt = "";
       img.decoding = "async";
       img.loading = "lazy";
-      if (item.imagePixelId) {
-        img.src = resolveCdnFetchUrl(item.imagePixelId, { useProxy: true, origin: location.origin });
-      } else {
-        img.src = `${TEMPLATE_PREVIEW_DIR_33}${id + 1}.png`;
-      }
-      img.onerror = () => {
-        img.src = `${TEMPLATE_PREVIEW_DIR_33}${id + 1}.png`;
-      };
+      setTemplateThumbnail(img, templateThumbnailSources(id, {
+        previewDir: TEMPLATE_PREVIEW_DIR_33,
+        backgroundDir: TEMPLATE_DIR_15,
+        remoteUrl: item.imagePixelId
+          ? resolveCdnFetchUrl(item.imagePixelId, { useProxy: true, origin: location.origin })
+          : "",
+        remoteFirst: true
+      }));
 
       const textWrap = document.createElement("div");
       textWrap.className = "template-thumb-text";
@@ -6712,6 +6979,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         storeJson: divoomStoreJson,
         divoomJson: isSimulatedDeviceMode() ? divoomStoreJson : divoomJson,
         clockId: id,
+        previewImagePixelId: item.imagePixelId,
         classifyId: item.classifyId,
         classifyName: classifyMeta?.ClassifyName,
         classifyNameEn: classifyMeta?.ClassifyNameEn,
@@ -7468,8 +7736,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     c.width = w;
     c.height = h;
     const ctx = c.getContext("2d");
-    const img = state.backgroundImage;
-    if (img && img.complete && img.naturalWidth > 0) {
+    const img = state.backgroundFrames[0] || state.backgroundImage;
+    if (img && (img.naturalWidth || img.displayWidth || img.width) > 0) {
       ctx.drawImage(img, 0, 0, w, h);
     } else {
       ctx.fillStyle = "#141c2b";
@@ -8583,6 +8851,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         ClockId: details.ClockId,
         ShareToOthers: uploadOptions.shareToOthers,
         ClassifyId: uploadOptions.classifyId,
+        Desc: String(state.config.DescCn || state.config.DescEn || ""),
         MessageInfo: uploadOptions.messageInfo
       });
       if (!result || Number(result.ReturnCode) !== 0 || result.Shared !== true) {
@@ -8788,7 +9057,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       if (btn) btn.disabled = false;
       if (activeLocalWatchfaceId) applyCurrentDeviceClockBinding();
       else refreshLanActionButtons();
-      void refreshLocalWatchfaceStatusForDevice({ force: true });
+      void syncSelectedDeviceWatchfaces();
       refreshTemplateSyncUi();
     }
   }
@@ -8822,7 +9091,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         const row = lanDeviceRowsById.get(id);
         if (row) persistLanDeviceRow(row);
         const clockId = applyCurrentDeviceClockBinding();
-        void refreshLocalWatchfaceStatusForDevice({ force: true });
+        void syncSelectedDeviceWatchfaces();
         void selectLocalWatchfaceOnDevice(clockId);
         refreshTemplateSyncUi();
       });
@@ -8916,7 +9185,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         img.alt = "";
         img.decoding = "async";
         img.loading = "lazy";
-        img.src = `${TEMPLATE_PREVIEW_DIR_33}${id + 1}.png`;
+        setTemplateThumbnail(img, templateThumbnailSourcesForId(id));
 
         const textWrap = document.createElement("div");
         textWrap.className = "template-thumb-text";
@@ -9078,6 +9347,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     } finally {
       templateState.loading = false;
       refreshTemplateListUi();
+      refreshLocalWatchfaceListUi();
     }
   }
 
@@ -9100,8 +9370,48 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     return loadFirstTemplateAsset(TEMPLATE_DIR_15, String(bgFileId), TEMPLATE_BG_EXT_CANDIDATES);
   }
 
-  async function loadTemplateAppPreviewByClockId(clockId) {
+  async function loadAnimatedTemplateBackgroundForLegacyRecord(rec, packId) {
+    const candidates = new Set();
+    const source = String(rec.backgroundSourceLabel || "").trim();
+    if (source) {
+      try {
+        const url = new URL(source, location.href);
+        if (url.origin === location.origin && url.pathname.includes("/template/15/")) {
+          candidates.add(url.href);
+        }
+      } catch { /* use the template asset paths below */ }
+    }
+    const fileId = Number(packId) + 1;
+    if (Number.isFinite(fileId) && fileId > 1 &&
+        String(rec.backgroundName || "").startsWith(`${fileId}.`)) {
+      for (const ext of TEMPLATE_BG_EXT_CANDIDATES) {
+        candidates.add(`${TEMPLATE_DIR_15}${fileId}${ext}`);
+      }
+    }
+    for (const path of candidates) {
+      try {
+        const asset = await loadLocalAssetFromUrl(path, rec.backgroundName || "background");
+        if (asset.frameCount > 1) return { asset, path };
+        releaseStandaloneAsset(asset);
+      } catch { /* try the next file; the saved still image remains available */ }
+    }
+    return null;
+  }
+
+  async function loadTemplateAppPreviewByClockId(clockId, appImageUrl = "") {
     const previewFileId = toNum(clockId, 0) + 1;
+    const appExt = extFromAssetPath(appImageUrl);
+    if (appImageUrl && TEMPLATE_PREVIEW_EXT_CANDIDATES.includes(appExt)) {
+      const result = await loadFirstTemplateAsset(TEMPLATE_PREVIEW_DIR_33, `${previewFileId}.app`, [appExt]);
+      if (result.asset) return result;
+      if (isCloudImageAddress(appImageUrl)) {
+        const remoteUrl = resolveCdnFetchUrl(appImageUrl, { useProxy: true, origin: location.origin });
+        try {
+          const asset = await loadLocalAssetFromUrl(remoteUrl);
+          return { asset, path: remoteUrl };
+        } catch { /* use the saved legacy preview */ }
+      }
+    }
     return loadFirstTemplateAsset(TEMPLATE_PREVIEW_DIR_33, String(previewFileId), TEMPLATE_PREVIEW_EXT_CANDIDATES);
   }
 
@@ -9180,7 +9490,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
     const [bgResult, previewResult, imageResult] = await Promise.all([
       loadTemplateBackgroundByClockId(id),
-      loadTemplateAppPreviewByClockId(id),
+      loadTemplateAppPreviewByClockId(id, raw.AppImageUrl),
       applyTemplateImageAssetsByClockId(id, token)
     ]);
     if (token !== templateState.loadToken) {
@@ -9203,7 +9513,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       setAppPreviewFromAsset(previewResult.asset);
       const rel = String(previewResult.path || "").trim();
       state.appPreviewSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
-      if (state.config && typeof state.config === "object") {
+      if (state.config && typeof state.config === "object" &&
+          !isCloudImageAddress(String(state.config.AppImageUrl || ""))) {
         state.config.AppImageUrl = previewResult.asset.name || `${id + 1}.png`;
       }
     } else {
@@ -9558,6 +9869,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
     const fileInput = document.createElement("input");
     fileInput.type = "file";
+    fileInput.multiple = rule.mode !== "pointer";
     fileInput.accept = "image/jpeg,image/jpg,image/gif,image/webp,.jpg,.jpeg,.jfif,.webp,.gif,.bin,.divm";
 
     const infoGrid = document.createElement("div");
@@ -9619,17 +9931,31 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     };
 
     fileInput.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (alertIfLocalPickFileTooLarge(file)) {
+      const files = [...(e.target.files || [])];
+      if (!files.length) return;
+      if (files.some(alertIfLocalPickFileTooLarge)) {
         fileInput.value = "";
         refresh();
         return;
       }
       try {
-        const asset = await loadLocalAssetFromFile(file);
+        if (files.length > 1) {
+          if (files.length > 2000) throw new Error(t("editor.asset.tooManyFrames"));
+          const selectionStatus = validateLocalAssetRule(rule, files.length);
+          if (selectionStatus.level !== "ok") {
+            alert(t("editor.asset.ruleRejected", { detail: selectionStatus.text }));
+            return;
+          }
+        }
+        const asset = await loadLocalAssetFromFiles(files);
+        const status = validateLocalAssetRule(rule, asset.frameCount);
+        if (status.level !== "ok") {
+          releaseStandaloneAsset(asset);
+          alert(t("editor.asset.ruleRejected", { detail: status.text }));
+          return;
+        }
         setLocalDispAsset(item, asset);
-        item.image_addr = file.name || "";
+        item.image_addr = asset.name || "";
         refreshItemListUi();
         renderWatchface();
         onLocalConfigEdited();
@@ -10006,9 +10332,13 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, state.width, state.height);
     if (!state.backgroundImage) return;
-    const img = state.backgroundImage;
-    const sw = img.width || 1;
-    const sh = img.height || 1;
+    const frameIndex = animationFrameIndex(
+      state.backgroundFrameDurations,
+      performance.now() - state.backgroundAnimationStartedAt
+    );
+    const img = state.backgroundFrames[frameIndex] || state.backgroundImage;
+    const sw = img.displayWidth || img.naturalWidth || img.width || 1;
+    const sh = img.displayHeight || img.naturalHeight || img.height || 1;
     const scale = Math.max(state.width / sw, state.height / sh);
     const dw = sw * scale;
     const dh = sh * scale;
@@ -10907,31 +11237,26 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     wireResponsiveFileInput(dom.inputBgFile);
     wireResponsiveFileInput(dom.inputAppPreviewFile);
 
-    dom.inputBgFile.addEventListener("change", (e) => {
+    dom.inputBgFile.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (alertIfLocalPickFileTooLarge(file)) {
         if (dom.inputBgFile) dom.inputBgFile.value = "";
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          clearBackgroundObjectUrl();
-          invalidatePersistImageCache("bg");
-          state.backgroundImage = img;
-          state.backgroundName = file.name;
-          state.backgroundSourceLabel = t("ui.bg.localFileHint", { name: file.name });
-          refreshBackgroundSourceLabel();
-          renderWatchface();
-          fontStore.log(t("log.backgroundLoaded", { name: file.name }));
-          onLocalConfigEdited();
-        };
-        img.onerror = () => alert(t("alert.backgroundLoadFailed"));
-        img.src = String(reader.result);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const asset = await loadLocalAssetFromFile(file);
+        invalidatePersistImageCache("bg");
+        setBackgroundFromAsset(asset);
+        state.backgroundName = file.name;
+        state.backgroundSourceLabel = t("ui.bg.localFileHint", { name: file.name });
+        refreshBackgroundSourceLabel();
+        renderWatchface();
+        fontStore.log(t("log.backgroundLoaded", { name: file.name }));
+        onLocalConfigEdited();
+      } catch {
+        alert(t("alert.backgroundLoadFailed"));
+      }
     });
 
     dom.btnClearBg.addEventListener("click", () => {
@@ -10958,6 +11283,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         reader.onload = () => {
           const img = new Image();
           img.onload = () => {
+            const dimensions = validateAppPreviewImage(img);
+            if (!dimensions.ok) {
+              dom.inputAppPreviewFile.value = "";
+              alert(t("lan.upload.previewDimensions", dimensions));
+              return;
+            }
             clearAppPreviewObjectUrl();
             invalidatePersistImageCache("appPreview");
             state.appPreviewImage = img;
@@ -10992,7 +11323,50 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     };
     if (dom.txtDescCn) dom.txtDescCn.addEventListener("input", onWatchDescInput);
     if (dom.txtDescEn) dom.txtDescEn.addEventListener("input", onWatchDescInput);
-
+    dom.txtDescUser?.addEventListener("input", () => {
+      if (!state.config || typeof state.config !== "object") return;
+      state.config.DescCn = dom.txtDescUser.value;
+      state.config.DescEn = dom.txtDescUser.value;
+      if (dom.txtDescCn) dom.txtDescCn.value = dom.txtDescUser.value;
+      if (dom.txtDescEn) dom.txtDescEn.value = dom.txtDescUser.value;
+      onLocalConfigEdited();
+    });
+    dom.txtRequestUrl?.addEventListener("input", () => {
+      if (!state.config || typeof state.config !== "object") return;
+      const value = dom.txtRequestUrl.value.trim();
+      if (value) state.config.RequestUrlAddr = value;
+      else delete state.config.RequestUrlAddr;
+      syncUserRequestAppConfig();
+      if (dom.txtRequestTime)
+        dom.txtRequestTime.value = state.config.RequestTime == null ? "" : String(state.config.RequestTime);
+      onLocalConfigEdited();
+    });
+    const onRequestTimeInput = () => {
+      if (!state.config || typeof state.config !== "object") return;
+      const raw = dom.txtRequestTime.value.trim();
+      if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) < 10) return;
+      state.config.RequestTime = Number(raw);
+      syncUserRequestAppConfig();
+      onLocalConfigEdited();
+    };
+    dom.txtRequestTime?.addEventListener("input", onRequestTimeInput);
+    dom.txtRequestTime?.addEventListener("change", () => {
+      if (!state.config || typeof state.config !== "object") return;
+      const raw = dom.txtRequestTime.value.trim();
+      if (raw) {
+        if (/^[1-9]\d*$/.test(raw) && Number.isSafeInteger(Number(raw)) && Number(raw) >= 10) {
+          onRequestTimeInput();
+          return;
+        }
+        dom.txtRequestTime.value = state.config.RequestTime == null ? "" : String(state.config.RequestTime);
+        return;
+      }
+      delete state.config.RequestTime;
+      syncUserRequestAppConfig();
+      if (dom.txtRequestTime)
+        dom.txtRequestTime.value = state.config.RequestTime == null ? "" : String(state.config.RequestTime);
+      onLocalConfigEdited();
+    });
     if (dom.inputFontFilter) {
       dom.inputFontFilter.addEventListener("input", refreshBuiltinFontList);
     }
@@ -11056,6 +11430,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     rebuildLanguageSelector();
     applyStaticI18n();
     rebuildTemplateClassifyRows();
+    await initializeWatchfacesStore();
 
     bindEvents();
     ensurePreviewStageResizeObserver();

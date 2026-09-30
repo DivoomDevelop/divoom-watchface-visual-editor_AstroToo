@@ -71,7 +71,7 @@
           <div class="asset-card__fields">
             <div class="field-row">
               <label id="lbl-input-bg-file" for="input-bg-file">选择底图</label>
-              <input id="input-bg-file" type="file" accept="image/*" />
+              <input id="input-bg-file" type="file" accept="image/*,.bin" />
             </div>
             <div class="field-row">
               <label id="lbl-bg-source-path" for="txt-bg-source-path">底图路径</label>
@@ -107,13 +107,30 @@
 
       <section class="card">
         <h2 id="sec-watch-desc-title">表盘描述</h2>
-        <div class="field-row">
+        <div class="field-row" id="desc-cn-row">
           <label id="lbl-desc-cn" for="txt-desc-cn">中文描述</label>
           <textarea id="txt-desc-cn" rows="2" spellcheck="false"></textarea>
         </div>
-        <div class="field-row">
+        <div class="field-row" id="desc-en-row">
           <label id="lbl-desc-en" for="txt-desc-en">英文描述</label>
           <textarea id="txt-desc-en" rows="2" spellcheck="false"></textarea>
+        </div>
+        <div class="field-row" id="desc-user-row" hidden>
+          <label id="lbl-desc-user" for="txt-desc-user">描述</label>
+          <textarea id="txt-desc-user" rows="2" spellcheck="false"></textarea>
+        </div>
+        <div id="user-request-fields" hidden>
+          <div class="field-row">
+            <div class="user-request-label-row">
+              <label id="lbl-request-url" for="txt-request-url">请求 URL</label>
+              <a id="btn-request-help" class="btn-ghost" href="./custom-url-help.html" target="_blank" rel="noopener noreferrer">使用说明</a>
+            </div>
+            <input id="txt-request-url" type="text" placeholder="https://example.com/watchface.json 或 localrequest" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="field-row">
+            <label id="lbl-request-time" for="txt-request-time">请求间隔（秒）</label>
+            <input id="txt-request-time" type="number" min="10" step="1" inputmode="numeric" placeholder="1800" />
+          </div>
         </div>
       </section>
 
@@ -299,6 +316,10 @@
       <p id="about-dblhint" class="hint about-dbl-hint"></p>
     </div>
     <p id="about-version-line" class="hint about-version-line"></p>
+    <div class="about-mode-row">
+      <span id="about-mode-label"></span>
+      <button type="button" id="about-mode-toggle" class="btn-ghost" aria-pressed="false"></button>
+    </div>
     <div class="lan-dialog-actions">
       <button type="button" id="about-admin-exit" class="btn-ghost" hidden></button>
       <button type="button" id="about-close" class="btn-primary"></button>

@@ -4,6 +4,16 @@ PC watchface editor for **AstroToo** devices (**480×480** logical canvas). Fork
 
 Vite + ES modules: application source lives under `src/`, large static assets under `public/`, and build output under `dist/`. The build uses **relative asset URLs** (`base: './'`) so you can copy the whole `dist/` folder as-is.
 
+## Desktop installer
+
+Windows users can install the self-contained `AstroToo-Watchface-Editor-*-win-x64-setup.exe`. The installer includes Electron, the editor, fonts, and templates; users do not need Node.js, Python, Vite, or a separate browser. Online sync and device operations still need network access and compatible device firmware. Downloaded fonts and templates are stored in the application's user-data directory and survive reinstalling or upgrading the app.
+
+The Windows setup wizard lets users choose whether to install for the current user or all users and select the installation folder.
+
+To build on Windows, run `npm ci` and `npm run desktop:make:win`; the installer is written to `out-desktop/`. On macOS, run `npm ci` and `npm run desktop:make:mac -- --arm64` or `--x64` to build the matching DMG. Developers can run `npm run desktop:start` for a local desktop preview. Public Windows and macOS releases are built by `.github/workflows/desktop-release.yml` and require signing credentials; local builds without credentials are unsigned.
+
+The macOS DMG contains the same multilingual app for Chinese and English users; the interface follows the system language on first launch and can be changed in the app. See the [English desktop packaging guide](docs/DESKTOP_PACKAGING.en.md) or [中文打包说明](docs/DESKTOP_PACKAGING.zh.md) for installation, test signing, and build details.
+
 ## Development
 
 ```bash
@@ -15,9 +25,9 @@ Open `http://127.0.0.1:5173/` in the browser. The app must be served over **HTTP
 
 ## Watchface upload and review
 
-The editor can create a watchface on a selected AstroToo, update its device configuration, upload it privately or submit it for public review, and show its current server status in **My designs**. Status is matched by the selected device's `DeviceId` and that design's `ClockId`. An APP preview image (no more than 480×480 pixels) is required for upload and is converted to WebP automatically.
+The editor can create a watchface on a selected AstroToo, update its device configuration, upload it privately or submit it for public review, and show its current server status in **My designs**. Status is matched by the selected device's `DeviceId` and that design's `ClockId`. A square APP preview image (no more than 500×500 pixels) is required for upload and is converted to WebP automatically.
 
-For usage, protocol details, and the `Status` meanings, see [Watchface upload and review (English)](docs/WATCHFACE_SHARE.en.md) or [表盘上传与审核（中文）](docs/WATCHFACE_SHARE.md). The feature needs device firmware with `SupportsClockShare` and a Vite-backed HTTP preview for the LAN/cloud proxy routes.
+For usage, protocol details, and the `Status` meanings, see [Watchface upload and review](docs/WATCHFACE_SHARE.en.md) or the [Chinese guide](docs/WATCHFACE_SHARE.md). The feature needs device firmware with `SupportsClockShare` and either the desktop app or a Vite-backed HTTP preview for the LAN/cloud proxy routes.
 
 ## Build
 

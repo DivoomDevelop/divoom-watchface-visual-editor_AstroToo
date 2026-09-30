@@ -16,7 +16,7 @@ import { downloadAssetBytes } from "../src/editor/cdnAssets.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const DEVICE_ID = Number(process.env.DIVOOM_DEVICE_ID || 300344410);
-const CHINA_API = (process.env.DIVOOM_CHINA_API_TARGET || "http://appchina.divoom-gz.com:9506").replace(
+const CHINA_API = (process.env.DIVOOM_CHINA_API_TARGET || "https://appchina.divoom-gz.com").replace(
   /\/$/,
   ""
 );

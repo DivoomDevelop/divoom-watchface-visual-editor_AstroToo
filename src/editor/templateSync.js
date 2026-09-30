@@ -1,6 +1,7 @@
 import { downloadAssetBytes, extFromAssetPath, extFromImageBytes } from "./cdnAssets.js";
 import { saveClassifyCacheViaApi, writeDevFileViaApi } from "./devSyncApi.js";
 import { collectFontIdsFromClockInfo, syncMissingFontsFromDevice } from "./fontSync.js";
+import { firstDivoomJpegGifFrame } from "./divoomJpegGif.js";
 
 export {
   DIVOOM_CDN_BASE,
@@ -299,7 +300,7 @@ export function enrichClockInfoForLocalSave(clockInfo) {
  * @param {(clockId:number, item:object)=>number|null} getSlotByItem
  * @param {(item:object)=>boolean} isImageItem
  */
-export function planTemplateAssetWrites(clockId, clockInfo, { getSlotByItem, isImageItem }) {
+export function planTemplateAssetWrites(clockId, clockInfo, { getSlotByItem, isImageItem, previewImagePixelId = "" }) {
   const id = Number(clockId);
   const writes = [];
   const seenUrls = new Set();
@@ -316,12 +317,18 @@ export function planTemplateAssetWrites(clockId, clockInfo, { getSlotByItem, isI
     queueUrl(`template/15/${id + 1}${extFromAssetPath(bgAddr)}`, bgAddr);
   }
 
+  const appImageAddr = String(clockInfo?.AppImageUrl || "").trim();
+  if (appImageAddr) {
+    queueUrl(`template/33/${id + 1}.app${extFromAssetPath(appImageAddr)}`, appImageAddr);
+  }
+
   const previewAddr =
     clockInfo?.DevicePreviewImageUrl ||
     clockInfo?.DevicePreviewImageUrl2 ||
     clockInfo?.DevPreviewSmallImgUrl ||
-    clockInfo?.DevPreviewSmallImgUrl2;
-  if (previewAddr) {
+    clockInfo?.DevPreviewSmallImgUrl2 ||
+    previewImagePixelId;
+  if (previewAddr && !appImageAddr) {
     queueUrl(`template/33/${id + 1}${extFromAssetPath(previewAddr)}`, previewAddr);
   }
 
@@ -342,6 +349,17 @@ function relPathWithDetectedImageExt(relPath, bytes) {
   const ext = extFromImageBytes(bytes);
   if (!ext) return relPath;
   return String(relPath || "").replace(/\.[^/.]+$/, ext);
+}
+
+async function writeTemplateAssetWithThumbnail(relPath, bytes, clockId) {
+  const savedPath = relPathWithDetectedImageExt(relPath, bytes);
+  await writeTemplateFileViaApi(savedPath, bytes);
+  if (savedPath.startsWith("template/15/") && savedPath.endsWith(".bin")) {
+    const firstFrame = firstDivoomJpegGifFrame(bytes);
+    if (firstFrame) {
+      await writeTemplateFileViaApi(`template/33/${clockId + 1}.jpg`, firstFrame);
+    }
+  }
 }
 
 /**
@@ -437,7 +455,7 @@ export async function syncTemplatesFromDevice({
         }
       }
 
-      const cfgObj = sanitizeClockInfoForCfg(remoteInfo);
+      const cfgObj = sanitizeClockInfoForCfg(enrichClockInfoForLocalSave(remoteInfo));
       for (const fontId of collectFontIdsFromClockInfo(cfgObj)) allFontIds.add(fontId);
       if (!skipConfig) {
         const cfgText = JSON.stringify(cfgObj, null, "\t");
@@ -446,7 +464,11 @@ export async function syncTemplatesFromDevice({
         configsWritten += 1;
       }
 
-      const assetWrites = planTemplateAssetWrites(clockId, cfgObj, { getSlotByItem, isImageItem });
+      const assetWrites = planTemplateAssetWrites(clockId, cfgObj, {
+        getSlotByItem,
+        isImageItem,
+        previewImagePixelId: row?.ImagePixelId
+      });
       for (const aw of assetWrites) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         try {
@@ -455,7 +477,7 @@ export async function syncTemplatesFromDevice({
             origin,
             signal
           });
-          await writeTemplateFileViaApi(relPathWithDetectedImageExt(aw.relPath, bytes), bytes);
+          await writeTemplateAssetWithThumbnail(aw.relPath, bytes, clockId);
           assetsWritten += 1;
         } catch {
           assetsFailed += 1;
@@ -559,6 +581,10 @@ export async function scanPendingTemplatesFromDevice({
             const lu = clockSysUpdateTime(localCfg);
             if (ru > 0 && lu !== ru) reason = "outdated";
             else if (ru > 0 && lu <= 0) reason = "outdated";
+            else if (String(remote.AppImageUrl || "").trim() &&
+                     String(localCfg.AppImageUrl || "").trim() !== String(remote.AppImageUrl).trim()) {
+              reason = "outdated";
+            }
           } catch {
             reason = "outdated";
           }
@@ -681,6 +707,7 @@ export async function downloadSingleTemplateToLocal({
   storeJson,
   divoomJson,
   clockId,
+  previewImagePixelId,
   classifyId,
   classifyName,
   classifyNameEn,
@@ -709,7 +736,11 @@ export async function downloadSingleTemplateToLocal({
   const enc = new TextEncoder();
   await writeTemplateFileViaApi(`template/config/${id}.cfg`, enc.encode(cfgText));
 
-  const assetWrites = planTemplateAssetWrites(id, remoteInfo, { getSlotByItem, isImageItem });
+  const assetWrites = planTemplateAssetWrites(id, remoteInfo, {
+    getSlotByItem,
+    isImageItem,
+    previewImagePixelId
+  });
   const assetTotal = Math.max(1, assetWrites.length);
   let assetDone = 0;
   let assetsFailed = 0;
@@ -719,7 +750,7 @@ export async function downloadSingleTemplateToLocal({
     report({ percent: pct, message: aw.relPath });
     try {
       const bytes = await downloadAssetBytes(aw.fileAddr, { useCdnProxy: true, origin });
-      await writeTemplateFileViaApi(relPathWithDetectedImageExt(aw.relPath, bytes), bytes);
+      await writeTemplateAssetWithThumbnail(aw.relPath, bytes, id);
     } catch (e) {
       assetsFailed += 1;
       failedPaths.push(`${aw.relPath}: ${e?.message || e}`);

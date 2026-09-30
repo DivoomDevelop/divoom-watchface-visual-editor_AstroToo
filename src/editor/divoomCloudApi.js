@@ -10,15 +10,17 @@ const DIVOOM_CHINA_REVIEW_API_BASE = "https://appchina.divoom-gz.com";
 export function resolveChinaStoreApiUrl(command) {
   const cmd = String(command || "").trim().replace(/^\//, "");
   if (!cmd) throw new Error("empty store API command");
-  const isReviewCommand = cmd === "Channel/GetUserClockReview"
+  const useHttpsApi = cmd === "Device/GetClockInfoV3"
+    || cmd === "Channel/GetDeviceClockIdList"
+    || cmd === "Channel/GetUserClockReview"
     || cmd === "Channel/GetDeviceClockInfo";
   const useProxy =
     typeof import.meta !== "undefined" &&
     import.meta.env?.VITE_DIVOOM_CHINA_DIRECT !== "1";
   if (useProxy) {
-    return `/${isReviewCommand ? "divoom-china-review-api" : "divoom-china-api"}/${cmd}`;
+    return `/${useHttpsApi ? "divoom-china-review-api" : "divoom-china-api"}/${cmd}`;
   }
-  const base = isReviewCommand ? DIVOOM_CHINA_REVIEW_API_BASE : DIVOOM_CHINA_API_BASE;
+  const base = useHttpsApi ? DIVOOM_CHINA_REVIEW_API_BASE : DIVOOM_CHINA_API_BASE;
   return `${base.replace(/\/$/, "")}/${cmd}`;
 }
 

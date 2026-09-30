@@ -1,0 +1,77 @@
+name: Desktop test installers
+
+on:
+  push:
+    branches: [codex/desktop-build-*]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build unsigned Windows installer
+        shell: pwsh
+        run: |
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astrotoo-windows-x64-test
+          path: out-desktop/*-win-x64-setup.exe
+          if-no-files-found: error
+
+  dmg:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build and verify ad-hoc signed test DMG
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm run build
+          npx electron-builder --config electron-builder.mac-test.config.cjs --mac dmg --${{ matrix.arch }} --publish never
+          hdiutil verify out-desktop/*-mac-${{ matrix.arch }}.dmg
+          mount="$RUNNER_TEMP/astrotoo-${{ matrix.arch }}"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" out-desktop/*-mac-${{ matrix.arch }}.dmg
+          trap 'hdiutil detach "$mount" || true' EXIT
+          codesign --verify --deep --strict --verbose=2 "$mount/AstroToo Watchface Editor.app"
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            open -n "$mount/AstroToo Watchface Editor.app" --args --remote-debugging-port=19345
+            ready=0
+            for attempt in $(seq 1 30); do
+              if curl -fsS --max-time 1 http://127.0.0.1:19345/json/list -o "$RUNNER_TEMP/astrotoo-pages.json" 2>/dev/null; then
+                if python3 -c 'import json,sys; pages=json.load(open(sys.argv[1])); assert any(p.get("type") == "page" and p.get("url", "").startswith("astrotoo://app/") for p in pages)' "$RUNNER_TEMP/astrotoo-pages.json"; then
+                  ready=1
+                  break
+                fi
+              fi
+              sleep 1
+            done
+            test "$ready" -eq 1
+            echo 'Packaged arm64 app loaded astrotoo://app/'
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astrotoo-macos-${{ matrix.arch }}-adhoc-test
+          path: out-desktop/*-mac-${{ matrix.arch }}.dmg
+          if-no-files-found: error

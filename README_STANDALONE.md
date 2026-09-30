@@ -1,11 +1,11 @@
-本仓库已改为 **Vite 工程**：请使用 `npm install` 与 `npm run dev` 启动（见根目录 `README.md`）。
+Windows users can run `out-desktop/AstroToo-Watchface-Editor-*-win-x64-setup.exe` to install the desktop app. The setup wizard lets users install for the current user or all users and choose the installation folder. Node.js, Python, Vite, and a separate browser are not required. For source development, use `npm install` and `npm run dev` (see the root `README.md`). The macOS installer is produced by the macOS build job.
 
-静态资源位于 `public/font`、`public/template`、`public/examples`；源码在 `src/`（入口 `src/main.js`，编辑器逻辑在 `src/editor/app.js`）。
+Static assets are in `public/font`, `public/template`, and `public/examples`. Source code is in `src/`, with `src/main.js` as the entry point and `src/editor/app.js` containing the editor logic.
 
-## 表盘上传与审核
+## Watchface upload and review
 
-在「我的设计」选择表盘和 LAN 设备后，可以创建/应用设备表盘配置，再上传线上表盘。上传前须选择宽、高都不超过 480 像素的 APP 预览图，工具会自动转为 WebP。公开分享须选择模板分类并等待管理员审核；更新线上表盘时须填写更新说明。左侧列表按当前设备的 `DeviceId + ClockId` 显示本地、待回复/待审核、已上线或审核未通过等状态，不会混用其他设备的结果。
+After selecting a watchface and a LAN device in **My designs**, you can create or apply the device watchface configuration and upload the watchface. Before uploading, select a square app preview image no larger than 500×500 pixels; the editor converts it to WebP automatically. Public sharing requires a template category and administrator review. Updating an uploaded watchface requires an update note. The list on the left shows local, pending, published, and rejected states for the selected device's `DeviceId + ClockId`, without mixing in results from other devices.
 
-完整操作、协议与状态说明见 [表盘上传与审核](docs/WATCHFACE_SHARE.md)；[English documentation](docs/WATCHFACE_SHARE.en.md)。此功能需要支持 `SupportsClockShare` 的真机固件，以及带代理功能的 Vite HTTP 预览。
+For the full workflow, protocol details, and status meanings, see [Watchface upload and review](docs/WATCHFACE_SHARE.en.md) or the [Chinese guide](docs/WATCHFACE_SHARE.md). This feature requires device firmware with `SupportsClockShare`. The desktop app includes the required proxy; the web development preview needs the Vite proxy.
 
-**English (Windows users):** For a double-click launch without typing commands, see **“Windows: one-click launch (English)”** in the root **`README.md`** (script **`Open-Editor.cmd`** in the project root).
+For a double-click browser launch without typing commands, see **Windows: one-click launch** in the root `README.md` (`Open-Editor.cmd` in the project root).

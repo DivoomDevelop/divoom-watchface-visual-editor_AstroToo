@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>自定义请求 URL 使用说明 · AstroToo Studio</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+    body { margin: 0; background: #101827; color: #e8edf7; line-height: 1.6; }
+    main { max-width: 960px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    h2 { margin-top: 34px; font-size: 20px; }
+    p, li { color: #c8d3e7; }
+    code, pre { font-family: Consolas, "Courier New", monospace; }
+    code { color: #ffcc97; }
+    pre { overflow: auto; padding: 18px; border: 1px solid #354360; border-radius: 10px; background: #0b1220; color: #d9ecff; }
+    .note { padding: 12px 16px; border-left: 3px solid #ffad72; background: #243148; border-radius: 6px; }
+    .table-wrap { overflow-x: auto; border: 1px solid #354360; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 660px; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #354360; }
+    th { background: #243148; }
+    tbody tr:nth-child(even) { background: #192438; }
+    .muted { color: #98a8c2; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>自定义请求 URL 使用说明</h1>
+  <p>在用户模式中填写设备可访问的 HTTP(S) URL，或填写特殊值 <code>localrequest</code>。编辑器保存 <code>RequestUrlAddr</code>、<code>RequestTime</code>，并在表盘配置的 <code>AppList</code> 中同步生成类型为 33 的应用项：<code>UrlInfo</code> 对应请求地址，<code>UpdateTime</code> 对应秒数。</p>
+  <p class="note">普通 HTTP(S) URL 由设备定时请求；固件将小于 10 秒的间隔改为 1800 秒，建议填写不小于 10 的整数。<code>localrequest</code> 由外部主动推送，请求间隔对它不起作用。浏览器预览不会定时请求 URL。</p>
+
+  <h2>localrequest：局域网主动推送</h2>
+  <p>将表盘的请求 URL 填为 <code>localrequest</code> 后，设备不发起 HTTP 请求。设备局域网接口使用 <strong>9000 端口</strong>；发送方将下列 JSON 作为请求体 POST 到 <code>http://设备IP:9000/divoom_api</code>。<code>DeviceId</code> 和 <code>ClockId</code> 必须是整数，分别填写目标设备 ID 和正在显示的表盘 ID；其余 <code>AppName</code>、<code>DispData</code> 字段与普通 URL 的返回格式相同。</p>
+  <pre><code>{
+  "Command": "Device/UpdatePCParaInfo",
+  "ReturnCode": 0,
+  "DeviceId": 123456789,
+  "ClockId": 12345,
+  "AppName": "环境数据",
+  "DispData": [
+    { "AppTitle": "温度", "AppData": "23°C" },
+    { "AppTitle": "湿度", "AppData": "62%" }
+  ]
+}</code></pre>
+  <p>将示例保存为 <code>local-data.json</code>，替换实际设备和表盘 ID 后，可用 <code>curl.exe -X POST "http://设备IP:9000/divoom_api" -H "Content-Type: application/json" --data-binary "@local-data.json"</code> 发送。设备只会更新当前已加载、类型为 33 且 URL 恰好为 <code>localrequest</code> 的匹配表盘；设备 ID 或表盘 ID 不匹配时不会更新显示。每次数据变化时重新发送完整 JSON。</p>
+
+  <h2>URL 返回格式</h2>
+  <p>请求地址应返回有效 JSON 对象。顶层 <code>AppName</code> 是应用名称；<code>DispData</code> 必须是非空数组。数组中的每一项用字符串 <code>AppTitle</code> 表示标题，用字符串 <code>AppData</code> 表示数值或文本。固件按数组顺序取值，从第 0 项开始。</p>
+  <pre><code>{
+  "AppName": "我的数据",
+  "DispData": [
+    { "AppTitle": "温度", "AppData": "23°C" },
+    { "AppTitle": "湿度", "AppData": "62%" },
+    { "AppTitle": "城市", "AppData": "深圳" }
+  ]
+}</code></pre>
+  <p>例如，把表盘中的显示元素设为 <code>APP_TITLE (disp 35)</code> 会显示“我的数据”；<code>APP_ITEM_NAME1 (disp 17)</code> 显示“温度”；<code>APP_ITEM_DATA1 (disp 16)</code> 显示“23°C”；<code>APP_ITEM_DATA2 (disp 38)</code> 显示“62%”。</p>
+
+  <h2>APP_CON_DATA（disp 42）使用说明</h2>
+  <p>在表盘中可以添加多个显示元素，并将每个元素的“显示元素类型（disp）”设为 <code>42 | app显示数据轮播</code>。这些元素都读取 <code>DispData[0].AppData</code> 和 <code>DispData[1].AppData</code>；可以分别设置位置、字体和颜色。<code>AppTitle</code> 不参与显示。</p>
+  <pre><code>{
+  "AppName": "环境数据",
+  "DispData": [
+    { "AppTitle": "温度", "AppData": "温度 23°C" },
+    { "AppTitle": "湿度", "AppData": "湿度 62%" }
+  ]
+}</code></pre>
+  <p>只有一个 <code>APP_CON_DATA</code> 元素时，按当前固件逻辑通常连续 10 次显示第一项；第 11 次刷新时，如果第二项非空，就显示第二项一次，然后重新计数。常规显示刷新间隔为 6 秒，收到新数据也可能触发刷新。这个显示节奏不等于上方填写的 URL 请求间隔；若只返回一项或第二项为空，元素会一直显示第一项。</p>
+  <p>添加多个 <code>APP_CON_DATA</code> 元素时，它们共享前两项数据和切换计数，不会按元素顺序分别对应 <code>DispData[0]</code>、<code>DispData[1]</code> 等项，也不能保证同时显示第二项。若要在不同位置固定显示不同返回值，请使用 <code>APP_ITEM_DATA1 (disp 16)</code>、<code>APP_ITEM_DATA2 (disp 38)</code> 等元素。</p>
+
+  <h2>返回值与显示元素对照</h2>
+  <p><code>DispData[i].AppData</code> 对应 <code>APP_ITEM_DATA{i+1}</code>。固件最多有 40 个数据槽。标题显示元素仅提供 1–3 号；其余项的 <code>AppTitle</code> 虽会被解析，但编辑器中没有同编号的标题显示元素。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>JSON 字段</th><th>显示元素</th><th>disp</th><th>作用</th></tr></thead>
+      <tbody id="mapping-rows">
+        <tr><td><code>AppName</code></td><td><code>APP_TITLE</code></td><td>35</td><td>应用名称</td></tr>
+        <tr><td><code>DispData[0/1].AppData</code></td><td><code>APP_CON_DATA</code></td><td>42</td><td>可添加多个；共用前两项数据和切换计数</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">解析逻辑依据设备模拟器的 <code>divoom_clock_control_analysis_custom_normal_rule_data</code>；编号对应编辑器的显示元素列表。每个标题和数据槽最多保存 127 字节，较长的 UTF-8 文本可能被截断。建议使用短文本。</p>
+</main>
+<script>
+  const dataDisp = [16, 38, 40, 41, 99, 100, 112, 113, 114, 115, 116, 117,
+    246, 247, 248, 249, 250, 251, 252, 253,
+    ...Array.from({ length: 20 }, (_, index) => 317 + index)];
+  const titleDisp = [17, 0, 43];
+  const body = document.getElementById("mapping-rows");
+  for (let index = 0; index < dataDisp.length; index += 1) {
+    if (index < titleDisp.length) {
+      const title = document.createElement("tr");
+      title.innerHTML = `<td><code>DispData[${index}].AppTitle</code></td><td><code>APP_ITEM_NAME${index + 1}</code></td><td>${titleDisp[index]}</td><td>第 ${index + 1} 项标题</td>`;
+      body.append(title);
+    }
+    const row = document.createElement("tr");
+    row.innerHTML = `<td><code>DispData[${index}].AppData</code></td><td><code>APP_ITEM_DATA${index + 1}</code></td><td>${dataDisp[index]}</td><td>第 ${index + 1} 项数据</td>`;
+    body.append(row);
+  }
+</script>
+</body>
+</html>

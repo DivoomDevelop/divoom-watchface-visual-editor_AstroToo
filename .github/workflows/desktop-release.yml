@@ -1,0 +1,91 @@
+name: Desktop release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Prepare Windows signing certificate
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.WIN_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: |
+          if (-not $env:CERT_BASE64 -or -not $env:CERT_PASSWORD) { throw "Windows signing secrets are required" }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "desktop-signing.pfx"
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERT_BASE64))
+          "WIN_CSC_LINK=$certificatePath" >> $env:GITHUB_ENV
+      - name: Make signed Windows installer
+        env:
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: npm run desktop:make:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: out-desktop/*-win-x64-setup.exe
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Make signed and notarized macOS DMG
+        env:
+          CSC_LINK: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID; do
+            if [[ -z "${!value}" ]]; then echo "Missing signing secret: $value"; exit 1; fi
+          done
+          npm run desktop:make:mac -- --${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-${{ matrix.arch }}
+          path: out-desktop/*-mac-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release-assets
+      - name: Publish installers to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find release-assets -type f \( -name '*.exe' -o -name '*.dmg' \) -print0)
+          test "${#files[@]}" -eq 3
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag

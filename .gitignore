@@ -1,5 +1,8 @@
 node_modules/
 dist/
+out/
+out-desktop/
+out-desktop-*/
 .DS_Store
 *.log
 /.codex-build-check*/

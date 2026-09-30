@@ -1,4 +1,4 @@
-export const APP_PREVIEW_MAX_DIMENSION = 480;
+export const APP_PREVIEW_MAX_DIMENSION = 500;
 
 function positiveInt(value) {
   const number = Number(value);
@@ -17,8 +17,7 @@ export function validateAppPreviewImage(image) {
   return {
     width,
     height,
-    ok: width > 0 && height > 0 &&
-      width <= APP_PREVIEW_MAX_DIMENSION && height <= APP_PREVIEW_MAX_DIMENSION
+    ok: width > 0 && width === height && width <= APP_PREVIEW_MAX_DIMENSION
   };
 }
 

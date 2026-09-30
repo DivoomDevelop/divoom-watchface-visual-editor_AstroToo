@@ -7,11 +7,11 @@ import {
   withDeviceUploadState
 } from "../src/editor/watchfaceUpload.js";
 
-assert.deepEqual(validateAppPreviewImage({ naturalWidth: 480, naturalHeight: 320 }), {
-  width: 480, height: 320, ok: true
+assert.deepEqual(validateAppPreviewImage({ naturalWidth: 500, naturalHeight: 500 }), {
+  width: 500, height: 500, ok: true
 });
-assert.equal(validateAppPreviewImage({ naturalWidth: 481, naturalHeight: 320 }).ok, false);
-assert.equal(validateAppPreviewImage({ naturalWidth: 320, naturalHeight: 481 }).ok, false);
+assert.equal(validateAppPreviewImage({ naturalWidth: 500, naturalHeight: 499 }).ok, false);
+assert.equal(validateAppPreviewImage({ naturalWidth: 501, naturalHeight: 501 }).ok, false);
 assert.equal(validateAppPreviewImage({ naturalWidth: 0, naturalHeight: 320 }).ok, false);
 
 let drawArgs = null;
@@ -30,11 +30,11 @@ const documentRef = {
     };
   }
 };
-const image = { naturalWidth: 400, naturalHeight: 300 };
+const image = { naturalWidth: 500, naturalHeight: 500 };
 const webp = await encodeAppPreviewWebp(image, { documentRef });
 assert.equal(webp.type, "image/webp");
 assert.equal(webp.size, 3);
-assert.deepEqual(drawArgs, [image, 0, 0, 400, 300]);
+assert.deepEqual(drawArgs, [image, 0, 0, 500, 500]);
 assert.equal(await encodeAppPreviewWebp({ naturalWidth: 800, naturalHeight: 300 }, { documentRef }), null);
 
 const states = withDeviceUploadState({}, 300426474, {
@@ -58,4 +58,4 @@ const normalized = normalizeDeviceUploadStates({
 assert.deepEqual(Object.keys(normalized), ["300426474"]);
 assert.equal(withDeviceUploadState(states, 300426474, null)[300426474], undefined);
 
-console.log("PASS: APP preview <=480 validation, WebP conversion, and DeviceId+ClockId upload-state binding");
+console.log("PASS: square APP preview <=500 validation, WebP conversion, and DeviceId+ClockId upload-state binding");

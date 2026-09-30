@@ -4,7 +4,7 @@ The device-side protocol is defined by the AstroToo firmware source at `Z:/allwi
 
 ## Use the editor
 
-Select a real LAN device. A design without a device `ClockId` shows **Create watchface**; one with an ID shows **Apply watchface config** in the same button position. The button is disabled when the configuration has not changed. After creation, choose **Upload Watchface**. An APP preview image is required: both width and height must be at most 480 pixels. The PC tool converts it to WebP before upload. In the confirmation dialog, choose whether to share with other users. Public uploads require one template category and administrator approval; private uploads remain visible only to the owner. An unchanged watchface cannot be uploaded again.
+Select a real LAN device. A design without a device `ClockId` shows **Create watchface**; one with an ID shows **Apply watchface config** in the same button position. The button is disabled when the configuration has not changed. After creation, choose **Upload Watchface**. A square APP preview image no larger than 500×500 pixels is required. The PC tool converts it to WebP before upload. In the confirmation dialog, choose whether to share with other users. Public uploads require one template category and administrator approval; private uploads remain visible only to the owner. An unchanged watchface cannot be uploaded again.
 
 After the first successful upload, the PC tool records online upload state against the `DeviceId` and `ClockId` pair, and the button becomes **Update online watchface**. An update requires a description, submitted in `MessageInfo`. The dialog retains the previous sharing choice and category but lets the user change them.
 

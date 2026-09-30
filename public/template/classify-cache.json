@@ -399,11 +399,22 @@
       ]
     },
     {
+      "ClassifyId": 106,
+      "ClassifyName": "情绪美学",
+      "ClassifyNameEn": "Mood Aesthetics",
+      "clockid": [
+        1920
+      ]
+    },
+    {
       "ClassifyId": 108,
       "ClassifyName": "复古科技",
       "ClassifyNameEn": "Retro Tech",
       "clockid": [
-        1888
+        1888,
+        1900,
+        1954,
+        1976
       ]
     },
     {
@@ -561,5 +572,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-09-24T01:02:14.592Z"
+  "generatedAt": "2026-09-24T05:45:54.089Z"
 }

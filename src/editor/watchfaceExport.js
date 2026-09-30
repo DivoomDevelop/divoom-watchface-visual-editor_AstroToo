@@ -205,11 +205,7 @@ function reconcileExportFileName(plannedName, preferredExt) {
   const stem = dot > 0 ? plannedName.slice(0, dot) : plannedName;
   const currentExt = dot > 0 ? plannedName.slice(dot) : "";
   if (currentExt.toLowerCase() === normalized.toLowerCase()) return plannedName;
-  if (/\.bin$/i.test(normalized)) return `${stem}${normalized}`;
-  if (/\.bin$/i.test(currentExt) || !KNOWN_IMAGE_EXTS.test(plannedName)) {
-    return `${stem}${normalized}`;
-  }
-  return plannedName;
+  return `${stem}${normalized}`;
 }
 
 function remapClockObjAssetRefs(clockObj, nameMap) {
@@ -381,11 +377,13 @@ function normalizeResolvedFetch(result) {
 }
 
 function pickExportExt({ sourceLeaf, dataUrl, bytes }) {
+  const fromHeader = extFromImageBytes(bytes);
+  if (fromHeader) return fromHeader;
   const fromLeaf = extFromFileName(sourceLeaf);
   if (fromLeaf && KNOWN_IMAGE_EXTS.test(`x${fromLeaf}`)) return fromLeaf;
   const fromDataUrl = extFromDataUrl(dataUrl);
   if (fromDataUrl) return fromDataUrl;
-  return extFromImageBytes(bytes) || "";
+  return "";
 }
 
 async function resolveAssetBytes(spec, deps) {

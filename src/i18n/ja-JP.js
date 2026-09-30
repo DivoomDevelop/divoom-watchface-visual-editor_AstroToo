@@ -70,7 +70,7 @@ const jaJP = Object.freeze({
   "browseTemplate.toolbarHint": "テンプレート閲覧は読み取り専用です。リストをクリックでプレビュー（サムネイルは template/33 を使用）。ダブルクリックまたは「テンプレートを適用」でマイデザインへコピーし、編集できます。",
   "template.hint.loading": "template/config をスキャン中です（初回は時間がかかることがあります）…",
   "template.hint.empty": "テンプレート設定が見つかりません。",
-  "template.hint.browse": "このカテゴリに表示中のテンプレートは {count} 件です。シングルクリックでプレビュー（一覧サムネイルは template/33、(ClockId+1).png、パッケージ済み資産と同じ +1 規則）。ダブルクリックまたは「適用」でマイデザインへ追加されます。",
+  "template.hint.browse": "このカテゴリに表示中のテンプレートは {count} 件です。クリックでプレビューし、ダブルクリックまたは「適用」でマイデザインへ追加できます。",
   "template.hint.error": "テンプレート一覧の読み込みに失敗しました: {message}",
   "ui.toolbar.clockId": "ClockId:",
   "ui.toolbar.clockIdNotUploaded": "このデザインはまだアップロードされていません",
