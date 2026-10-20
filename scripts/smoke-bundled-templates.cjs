@@ -74,8 +74,9 @@ app.whenReady().then(async () => {
           .filter((img) => img.complete && img.naturalWidth > 0).length;
         return count === 16 ? count : null;
       }, 'all thumbnails');
+      const copiedTemplateTitle = document.querySelector('#template-list .template-id').textContent;
       document.querySelector('#template-list li').click();
-      await until(() => document.getElementById('txt-clock-title')?.textContent.includes('磁带循环'), 'selected copy template');
+      await until(() => document.getElementById('txt-clock-title')?.textContent === copiedTemplateTitle, 'selected copy template');
       await sleep(300);
       document.getElementById('btn-apply-template').click();
       await until(() => document.getElementById('local-save-named-dialog')?.open, 'apply naming dialog');
