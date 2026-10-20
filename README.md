@@ -1,20 +1,18 @@
 # Divoom AstroToo watchface visual editor
 
-## 下载安装 / Downloads
+## Downloads
 
-**直接下载安装包，无需下载源码或安装开发环境。** / Download an installer; no development tools are required.
+**Download an installer; no development tools are required.**
 
-| 系统 / Platform | 安装包 / Installer |
+| Platform | Installer |
 | --- | --- |
-| Windows 64 位 | [下载 Windows 安装包 (.exe)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-win-x64-setup.exe) |
-| Mac — Apple 芯片 / Apple silicon | [下载 Mac Apple 芯片版 (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-arm64.dmg) |
-| Mac — Intel | [下载 Mac Intel 版 (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-x64.dmg) |
-
-三个安装包均内置 **16 个模板及其资源**，无需另外下载模板。当前为 build 14 测试版本：Windows 未签名，Mac 使用临时签名、未做 Apple 公证。
+| Windows 64-bit | [Download Windows installer (.exe)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-win-x64-setup.exe) |
+| Mac — Apple silicon | [Download Mac Apple silicon installer (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-arm64.dmg) |
+| Mac — Intel | [Download Mac Intel installer (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-x64.dmg) |
 
 All installers include 16 offline templates and their resources. Build 14 is a test version: Windows is unsigned; macOS is ad-hoc signed and not notarized.
 
-[版本说明与全部安装包 / Release notes and all downloads](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/tag/desktop-test-20261020)
+[Release notes and all downloads](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/tag/desktop-test-20261020)
 
 PC watchface editor for **AstroToo** devices (**480×480** logical canvas). Forked from [divoom-watchface-visual-editor_v2](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_v2).
 
@@ -33,7 +31,7 @@ Open `http://127.0.0.1:5173/` in the browser. The app must be served over **HTTP
 
 The editor can create a watchface on a selected AstroToo, update its device configuration, upload it privately or submit it for public review, and show its current server status in **My designs**. Status is matched by the selected device's `DeviceId` and that design's `ClockId`. An APP preview image (no more than 480×480 pixels) is required for upload and is converted to WebP automatically.
 
-For usage, protocol details, and the `Status` meanings, see [Watchface upload and review (English)](docs/WATCHFACE_SHARE.en.md) or [表盘上传与审核（中文）](docs/WATCHFACE_SHARE.md). The feature needs device firmware with `SupportsClockShare` and a Vite-backed HTTP preview for the LAN/cloud proxy routes.
+For usage, protocol details, and the `Status` meanings, see [Watchface upload and review (English)](docs/WATCHFACE_SHARE.en.md) or [Watchface upload and review (Chinese)](docs/WATCHFACE_SHARE.md). The feature needs device firmware with `SupportsClockShare` and a Vite-backed HTTP preview for the LAN/cloud proxy routes.
 
 ## Build
 
