@@ -1,20 +1,18 @@
 # Divoom AstroToo watchface visual editor
 
-## 下载安装 / Downloads
+## Downloads
 
-**直接下载安装包，无需下载源码或安装开发环境。** / Download an installer; no development tools are required.
+**Download an installer; no development tools are required.**
 
-| 系统 / Platform | 安装包 / Installer |
+| Platform | Installer |
 | --- | --- |
-| Windows 64 位 | [下载 Windows 安装包 (.exe)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-win-x64-setup.exe) |
-| Mac — Apple 芯片 / Apple silicon | [下载 Mac Apple 芯片版 (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-arm64.dmg) |
-| Mac — Intel | [下载 Mac Intel 版 (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-x64.dmg) |
-
-三个安装包均内置 **16 个模板及其资源**，无需另外下载模板。当前为 build 14 测试版本：Windows 未签名，Mac 使用临时签名、未做 Apple 公证。
+| Windows 64-bit | [Download Windows installer (.exe)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-win-x64-setup.exe) |
+| Mac — Apple silicon | [Download Mac Apple silicon installer (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-arm64.dmg) |
+| Mac — Intel | [Download Mac Intel installer (.dmg)](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/download/desktop-test-20261020/AstroToo-Watchface-Editor-0.1.1-mac-x64.dmg) |
 
 All installers include 16 offline templates and their resources. Build 14 is a test version: Windows is unsigned; macOS is ad-hoc signed and not notarized.
 
-[版本说明与全部安装包 / Release notes and all downloads](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/tag/desktop-test-20261020)
+[Release notes and all downloads](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_AstroToo/releases/tag/desktop-test-20261020)
 
 PC watchface editor for **AstroToo** devices (**480×480** logical canvas). Forked from [divoom-watchface-visual-editor_v2](https://github.com/DivoomDevelop/divoom-watchface-visual-editor_v2).
 
@@ -28,7 +26,7 @@ The Windows setup wizard lets users choose whether to install for the current us
 
 To build on Windows, run `npm ci` and `npm run desktop:make:win`; the installer is written to `out-desktop/`. On macOS, run `npm ci` and `npm run desktop:make:mac -- --arm64` or `--x64` to build the matching DMG. Developers can run `npm run desktop:start` for a local desktop preview. Public Windows and macOS releases are built by `.github/workflows/desktop-release.yml` and require signing credentials; local builds without credentials are unsigned.
 
-The macOS DMG contains the same multilingual app for Chinese and English users; the interface follows the system language on first launch and can be changed in the app. See the [English desktop packaging guide](docs/DESKTOP_PACKAGING.en.md) or [中文打包说明](docs/DESKTOP_PACKAGING.zh.md) for installation, test signing, and build details.
+The macOS DMG contains the same multilingual app for Chinese and English users; the interface follows the system language on first launch and can be changed in the app. See the [English desktop packaging guide](docs/DESKTOP_PACKAGING.en.md) or [Chinese desktop packaging guide](docs/DESKTOP_PACKAGING.zh.md) for installation, test signing, and build details.
 
 ## Development
 
