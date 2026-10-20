@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import { createDivoomChinaStoreJson } from "../src/editor/divoomCloudApi.js";
+import { deviceUploadStateFromClock, getDeviceUploadState } from "../src/editor/watchfaceUpload.js";
 
 const originalFetch = globalThis.fetch;
 let requestedUrl = "";
@@ -62,6 +63,8 @@ const context = vm.createContext({
   localWatchClockStatusByDevice: new Map(),
   localWatchStatusRequestSeq: 0,
   refreshLocalWatchfaceListUi: () => {},
+  refreshLanActionButtons: () => {},
+  deviceUploadStateFromClock,
   lanReviewView: {
     phase: "idle", deviceId: 0, clockId: 0, records: [], error: "",
     statusPhase: "idle", statusCode: null, statusError: ""
@@ -149,4 +152,24 @@ statusResponse = new Error("status offline");
 await context.refreshLocalWatchfaceStatusForDevice({ force: true });
 assert.equal(context.localWatchfaceStatus(300426474, 60003).key, "unknown");
 
-console.log("PASS: live-status route, all five statuses, matching ClockId, independent errors and review roles");
+const uploadStart = source.indexOf("  function activeOnlineUploadState()");
+vm.runInContext(source.slice(uploadStart, start), context);
+context.activeDeviceUploadStates = {};
+context.getDeviceUploadState = getDeviceUploadState;
+statusResponse = { ClockList: [{ ClockId: 60003, Status: 3, ClassifyId: 30 }] };
+await context.refreshLocalWatchfaceStatusForDevice({ force: true });
+assert.equal(context.lanUploadButtonTranslationKey(), "ui.btn.lanUpdateOnline", "server-only upload must show update");
+assert.equal(context.activeOnlineUploadState().shareToOthers, true);
+assert.equal(context.activeOnlineUploadState().classifyId, 30);
+context.state.config.ClockId = 60004;
+assert.equal(context.activeOnlineUploadState(), null, "another clock must not inherit sharing settings");
+context.state.config.ClockId = 60003;
+context.activeDeviceUploadStates = { 300426474: { clockId: 60003, shareToOthers: true } };
+statusResponse.ClockList[0].Status = 0;
+await context.refreshLocalWatchfaceStatusForDevice({ force: true });
+assert.equal(context.activeOnlineUploadState().shareToOthers, false, "current server settings override local history");
+statusResponse = new Error("offline");
+await context.refreshLocalWatchfaceStatusForDevice({ force: true });
+assert.equal(context.activeOnlineUploadState().shareToOthers, true, "offline keeps the previously saved upload choice");
+
+console.log("PASS: server-bound updates, live statuses, matching ClockId, independent errors and review roles");

@@ -20,7 +20,7 @@ const CHINA_API = (process.env.DIVOOM_CHINA_API_TARGET || "https://appchina.divo
   /\/$/,
   ""
 );
-const TEMPLATE_SLOT_COUNT = 128;
+const TEMPLATE_SLOT_COUNT = 256;
 const DISP_OFFSET = { 13: 29, 46: 0, 66: 13 };
 
 function parseArgs() {

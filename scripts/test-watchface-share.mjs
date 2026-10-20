@@ -125,6 +125,90 @@ ctx.lanSyncBusy = true; calls.length = 0;
 await ctx.onLanShareWatchfaceClick();
 assert.equal(calls.length, 0);
 ctx.lanSyncBusy = false; uploadChanged = false;
+isUpdate = false;
 await ctx.onLanShareWatchfaceClick();
 assert.equal(calls.length, 0, "unchanged watchface cannot upload again");
+isUpdate = true;
+await ctx.onLanShareWatchfaceClick();
+assert(calls.includes("Device/ShareLocalClock"), "sharing settings can update an uploaded clock without content edits");
 console.log("PASS: public/private forwarding, sequential assets, patch-before-share, failure stops publish, capability, ACK, busy guard and UI recovery");
+
+const dialogStart = source.indexOf("  function openLanUploadConfirmDialog(");
+const dialogEnd = source.indexOf("  async function onLanShareWatchfaceClick(", dialogStart);
+class Control extends EventTarget {
+  hidden = false;
+  value = "";
+  checked = false;
+  open = false;
+  setAttribute() {}
+  focus() {}
+  showModal() { this.open = true; }
+  close() { this.open = false; }
+}
+const dialogDom = Object.fromEntries([
+  "lanUploadDialog", "lanUploadForm", "lanUploadTitle", "lanUploadBody", "lanUploadMessageField",
+  "lanUploadMessage", "lanUploadMessageError", "lanUploadSharePublic", "lanUploadClassify",
+  "lanUploadClassifyError", "lanUploadUnchangedError", "lanUploadSubmit", "lanUploadCancel"
+].map(key => [key, new Control()]));
+const dialogErrors = [];
+const dialogCtx = vm.createContext({
+  dom: dialogDom, Number, String,
+  resolveLanDeviceCreateClockName: () => "test", t: key => key,
+  toNum: (value, fallback) => Number(value) || fallback,
+  setNodeText: (node, value) => { node.textContent = value; },
+  refreshLanUploadDialogReviewNote() {},
+  populateLanUploadClassifyOptions: id => { dialogDom.lanUploadClassify.value = String(id || ""); },
+  alert: message => dialogErrors.push(message)
+});
+vm.runInContext(source.slice(dialogStart, dialogEnd), dialogCtx);
+const submit = () => dialogDom.lanUploadForm.dispatchEvent(new Event("submit", { cancelable: true }));
+let confirmation = dialogCtx.openLanUploadConfirmDialog({ isUpdate: false });
+assert.equal(dialogDom.lanUploadSharePublic.checked, false, "first upload defaults to private");
+assert.equal(dialogDom.lanUploadMessageField.hidden, true);
+submit();
+assert.equal((await confirmation).shareToOthers, false);
+
+confirmation = dialogCtx.openLanUploadConfirmDialog({ isUpdate: false });
+dialogDom.lanUploadSharePublic.checked = true;
+submit();
+assert.equal(dialogDom.lanUploadClassifyError.hidden, false, "public upload requires category");
+assert.equal(dialogDom.lanUploadDialog.open, true);
+dialogDom.lanUploadClassify.value = "30";
+submit();
+assert.equal((await confirmation).classifyId, 30);
+
+confirmation = dialogCtx.openLanUploadConfirmDialog({
+  isUpdate: true, previousShareToOthers: true, previousClassifyId: 30, hasContentChanges: false
+});
+assert.equal(dialogDom.lanUploadSharePublic.checked, true, "update retains sharing choice");
+assert.equal(dialogDom.lanUploadClassify.value, "30");
+submit();
+assert.equal(dialogDom.lanUploadMessageError.hidden, false, "update requires notes");
+dialogDom.lanUploadMessage.value = "Change sharing";
+submit();
+assert.equal(dialogDom.lanUploadUnchangedError.hidden, false, "identical update is blocked");
+assert.equal(dialogDom.lanUploadDialog.open, true);
+dialogDom.lanUploadSharePublic.checked = false;
+dialogDom.lanUploadSharePublic.dispatchEvent(new Event("change"));
+assert.equal(dialogDom.lanUploadUnchangedError.hidden, true);
+submit();
+const privateUpdate = await confirmation;
+assert.equal(privateUpdate.shareToOthers, false);
+assert.equal(privateUpdate.classifyId, 0);
+assert.equal(privateUpdate.messageInfo, "Change sharing");
+
+confirmation = dialogCtx.openLanUploadConfirmDialog({
+  isUpdate: true, previousShareToOthers: true, previousClassifyId: 30, hasContentChanges: false
+});
+dialogDom.lanUploadMessage.value = "Change category";
+dialogDom.lanUploadClassify.value = "58";
+submit();
+assert.equal((await confirmation).classifyId, 58, "category-only update is allowed");
+
+confirmation = dialogCtx.openLanUploadConfirmDialog({ isUpdate: true });
+dialogDom.lanUploadCancel.dispatchEvent(new Event("click"));
+assert.equal(await confirmation, null);
+dialogDom.lanUploadDialog = null;
+assert.equal(await dialogCtx.openLanUploadConfirmDialog({ isUpdate: true }), null);
+assert.equal(dialogErrors.at(-1), "lan.upload.dialogUnavailable", "missing dialog must never silently change sharing");
+console.log("PASS: sharing confirmation, update notes, category validation, duplicate blocking and cancellation");

@@ -1784,6 +1784,152 @@ button:hover:not(:disabled),
   color: var(--text);
 }
 
+.about-dialog,
+.admin-password-dialog {
+  padding: 28px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+}
+
+.about-dialog {
+  width: 480px;
+}
+
+.about-dialog .lan-dialog-title {
+  margin-bottom: 20px;
+  font-size: 20px;
+}
+
+.about-dialog .about-doubleclick-zone {
+  padding: 16px;
+  margin-bottom: 18px;
+  border-color: var(--line-strong);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.about-dialog .lan-dialog-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.about-dialog .hint {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1.6;
+}
+
+.about-dialog .about-dbl-hint {
+  margin: 12px 0 0;
+  color: var(--accent-strong);
+}
+
+.about-dialog .about-version-line {
+  margin: 0 0 16px;
+  font-size: 12px;
+}
+
+.about-dialog .about-mode-row {
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.about-dialog .lan-dialog-actions {
+  flex-wrap: wrap;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-password-dialog {
+  width: 400px;
+}
+
+.admin-password-dialog::backdrop {
+  background: rgba(28, 27, 26, 0.32);
+  backdrop-filter: blur(3px);
+}
+
+.admin-password-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 26px;
+}
+
+.admin-password-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+.admin-password-header .lan-dialog-title {
+  margin: 0 0 5px;
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+
+.admin-password-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-password-dialog .lan-dialog-field {
+  gap: 9px;
+  margin: 0;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.admin-password-dialog .lan-dialog-field[hidden] {
+  display: none;
+}
+
+.admin-password-dialog input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.admin-password-dialog input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+.admin-password-dialog input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.admin-password-status {
+  min-height: 20px;
+  margin: 8px 0 18px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.admin-password-status[data-state="success"] {
+  color: var(--ok);
+}
+
+.admin-password-dialog .lan-dialog-actions button {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
 .layout-mode-template .browse-template-toolbar-hint {
   color: var(--muted);
 }

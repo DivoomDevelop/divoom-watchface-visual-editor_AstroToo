@@ -50,6 +50,7 @@ function writablePath(input) {
   if (rel.includes("..") || rel.includes("\0")) throw new Error("invalid write path");
   if (/^template\/config\/\d+\.cfg$/.test(rel)) return rel;
   if (/^template\/(?:15|29)\/\d+\.(?:bin|png|jpe?g|gif|webp|bmp)$/i.test(rel) ||
+      /^template\/29\/astrotoo-\d+\.(?:bin|png|jpe?g|gif|webp|bmp)$/i.test(rel) ||
       /^template\/33\/\d+(?:\.app)?\.(?:bin|png|jpe?g|gif|webp|bmp)$/i.test(rel)) return rel;
   if (rel === "template/classify-cache.json") return rel;
   if (rel === "font/font_info.cfg" || /^font\/\d+\.bin$/i.test(rel)) return rel;

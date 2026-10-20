@@ -38,7 +38,7 @@ let failAsset = "";
 const details = { ClockList: [
   { ClockId: 7, Name: "Server copy", ItemList: [] },
   { ClockId: 8, Name: "New cloud dial", PreviewImageUrl: "group/preview.jpg",
-    DeviceImageId: "group/background.webp", Status: 3,
+    DeviceImageId: "group/background.webp", Status: 3, ClassifyId: 30,
     ItemList: [{ item_id: "image", image_addr: "group/element.png" }] },
   { ClockId: 9, Name: "Retry after failure", DeviceImageId: "group/missing.png", ItemList: [] }
 ] };
@@ -68,6 +68,9 @@ assert.equal(rows[0].name, "Edited locally");
 assert.equal(rows[1].source, "deviceCloud");
 assert.equal(rows[1].config.ClockId, 8);
 assert.equal(rows[1].deviceClockIds[deviceId], 8);
+assert.equal(rows[1].deviceUploadStates[deviceId].clockId, 8);
+assert.equal(rows[1].deviceUploadStates[deviceId].shareToOthers, true);
+assert.equal(rows[1].deviceUploadStates[deviceId].classifyId, 30);
 assert.equal(rows[1].localDispAssets[0].dataUrl.startsWith("data:"), true);
 assert.deepEqual(downloads, ["group/background.webp", "group/preview.jpg", "group/element.png", "group/missing.png"]);
 

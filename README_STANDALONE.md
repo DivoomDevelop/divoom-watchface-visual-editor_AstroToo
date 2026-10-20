@@ -2,6 +2,8 @@ Windows users can run `out-desktop/AstroToo-Watchface-Editor-*-win-x64-setup.exe
 
 Static assets are in `public/font`, `public/template`, and `public/examples`. Source code is in `src/`, with `src/main.js` as the entry point and `src/editor/app.js` containing the editor logic.
 
+The template page shows the built-in snapshot from `Device/GetDemoClockList` directly, without categories or an update/download step. `public/template/demo-catalog.json` lists the bundled configurations, images, animations, and font checksums; Vite and the desktop installer include them automatically. Previewing and copying templates work offline. Maintainers can verify the snapshot with `node scripts/bundle-demo-templates.mjs --check`; the download script is never run by the app or normal builds. The current snapshot has 16 templates. The server's invalid background for template 1852 is replaced by its existing full-size animation layer; unavailable font 2 uses the editor's default font. Font 142 has a separate bundled copy with corrected SFNT metadata for Chromium compatibility.
+
 ## Watchface upload and review
 
 After selecting a watchface and a LAN device in **My designs**, you can create or apply the device watchface configuration and upload the watchface. Before uploading, select a square app preview image no larger than 500×500 pixels; the editor converts it to WebP automatically. Public sharing requires a template category and administrator review. Updating an uploaded watchface requires an update note. The list on the left shows local, pending, published, and rejected states for the selected device's `DeviceId + ClockId`, without mixing in results from other devices.

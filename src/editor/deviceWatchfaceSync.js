@@ -1,5 +1,6 @@
 import { downloadAssetBytes, extFromImageBytes } from "./cdnAssets.js";
 import { getDeviceClockId, normalizeDeviceClockBindings } from "./deviceClockBindings.js";
+import { deviceUploadStateFromClock } from "./watchfaceUpload.js";
 
 function positiveId(value) {
   const id = Number(value);
@@ -75,6 +76,7 @@ export async function syncDeviceWatchfaces({ deviceId, storeJson, list, save, lo
         });
       }
       if (localIds().has(clockId)) continue;
+      const uploadState = deviceUploadStateFromClock(row);
       await save({
         id: `wf-device-${id}-${clockId}`, source: "deviceCloud", name, updatedAt: Date.now(), config,
         backgroundDataUrl, backgroundName: bgPath.split("/").pop() || "",
@@ -83,7 +85,8 @@ export async function syncDeviceWatchfaces({ deviceId, storeJson, list, save, lo
         appPreviewSourceLabel: previewPath,
         localDispAssets, width: 480, height: 480, zoom: 55,
         previewOverrides: {}, templateActiveClockId: null,
-        deviceClockIds: { [id]: clockId }, deviceUploadStates: {}
+        deviceClockIds: { [id]: clockId },
+        deviceUploadStates: uploadState ? { [id]: uploadState } : {}
       });
       imported += 1;
     } catch (error) {

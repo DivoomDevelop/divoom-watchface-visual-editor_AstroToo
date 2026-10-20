@@ -1,0 +1,2 @@
+# Configurations are checksummed byte-for-byte by the offline template snapshot.
+public/template/demo/*.cfg text eol=lf

@@ -17,12 +17,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Verify bundled templates and run regression tests
+        run: |
+          node scripts/bundle-demo-templates.mjs --check
+          node --test scripts/test-*.mjs scripts/test-*.cjs
       - name: Build unsigned Windows installer
         shell: pwsh
         run: |
           npm run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-packaged-templates.cjs out-desktop/win-unpacked/resources/app.asar
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx electron scripts/smoke-bundled-templates.cjs out-desktop/win-unpacked/resources/app.asar/dist
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
@@ -43,6 +51,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Verify bundled template snapshot
+        run: node scripts/bundle-demo-templates.mjs --check
       - name: Build and verify ad-hoc signed test DMG
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -55,6 +65,7 @@ jobs:
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" out-desktop/*-mac-${{ matrix.arch }}.dmg
           trap 'hdiutil detach "$mount" || true' EXIT
           codesign --verify --deep --strict --verbose=2 "$mount/AstroToo Watchface Editor.app"
+          node scripts/verify-packaged-templates.cjs "$mount/AstroToo Watchface Editor.app/Contents/Resources/app.asar"
           if [[ "${{ matrix.arch }}" == "arm64" ]]; then
             open -n "$mount/AstroToo Watchface Editor.app" --args --remote-debugging-port=19345
             ready=0

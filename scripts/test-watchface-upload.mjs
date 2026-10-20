@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  deviceUploadStateFromClock,
   encodeAppPreviewWebp,
   getDeviceUploadState,
   normalizeDeviceUploadStates,
@@ -58,4 +59,15 @@ const normalized = normalizeDeviceUploadStates({
 assert.deepEqual(Object.keys(normalized), ["300426474"]);
 assert.equal(withDeviceUploadState(states, 300426474, null)[300426474], undefined);
 
-console.log("PASS: square APP preview <=500 validation, WebP conversion, and DeviceId+ClockId upload-state binding");
+for (const status of [0, 1, 2, 3, 4]) {
+  const uploaded = deviceUploadStateFromClock({ ClockId: "60003", Status: String(status), ClassifyId: "30" });
+  assert.equal(uploaded.clockId, 60003);
+  assert.equal(uploaded.shareToOthers, status > 0);
+  assert.equal(uploaded.classifyId, 30);
+}
+for (const status of [undefined, null, -1, 5, 1.5, "invalid"]) {
+  assert.equal(deviceUploadStateFromClock({ ClockId: 60003, Status: status }), null);
+}
+assert.equal(deviceUploadStateFromClock({ ClockId: 0, Status: 3 }), null);
+
+console.log("PASS: APP preview validation, WebP conversion, device-bound upload state and server sharing status");

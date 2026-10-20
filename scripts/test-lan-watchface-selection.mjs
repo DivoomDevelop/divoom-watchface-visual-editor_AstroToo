@@ -36,7 +36,7 @@ const dom = {
   btnLanShowCurrentClockOnDevice: {},
   btnLanShareWatchface: { setAttribute() {} }
 };
-let deviceChanged = false, uploadChanged = false;
+let deviceChanged = false, uploadChanged = false, uploaded = false;
 const buttonContext = vm.createContext({
   dom,
   state: { config: { ClockId: 60001 } },
@@ -48,6 +48,7 @@ const buttonContext = vm.createContext({
   hasLanDeviceHttpTarget: () => true,
   hasLanDeviceChanges: () => deviceChanged,
   hasLanUploadChanges: () => uploadChanged,
+  activeOnlineUploadState: () => uploaded ? { clockId: 60001 } : null,
   lanUploadButtonTranslationKey: () => "ui.btn.lanShare",
   t: value => value,
   setNodeText: (element, label) => { element.textContent = label; }
@@ -57,6 +58,10 @@ buttonContext.refreshLanActionButtons();
 assert.equal(dom.btnLanCreateOnDevice.textContent, "ui.btn.lanApplyWatchfaceConfig");
 assert.equal(dom.btnLanCreateOnDevice.disabled, true, "unchanged clock cannot be applied");
 assert.equal(dom.btnLanShareWatchface.disabled, true, "unchanged clock cannot be uploaded");
+uploaded = true;
+buttonContext.refreshLanActionButtons();
+assert.equal(dom.btnLanShareWatchface.disabled, false, "uploaded clock can change its sharing settings without content edits");
+uploaded = false;
 
 deviceChanged = true; uploadChanged = true;
 buttonContext.refreshLanActionButtons();
@@ -101,6 +106,7 @@ assert.equal(await selectContext.selectLocalWatchfaceOnDevice(0), false);
 assert.equal(calls.length, 1);
 
 const selectedIds = [];
+const restoredIds = [];
 const loadContext = vm.createContext({
   activeLocalWatchfaceId: "",
   namingPromptDismissed: false,
@@ -110,13 +116,15 @@ const loadContext = vm.createContext({
   ensureWorkspaceHandledBeforeSwitch: async () => true,
   getWatchface: id => ({ id, config: { ClockId: 60002 } }),
   setLastActiveId() {},
-  restoreWorkspaceFromRecord: async () => {},
+  restoreWorkspaceFromRecord: async record => { restoredIds.push(record.id); },
   refreshLocalWatchfaceListUi() {},
   selectLocalWatchfaceOnDevice: async id => { selectedIds.push(id); return true; }
 });
 vm.runInContext(loadSource, loadContext);
 await loadContext.loadLocalWatchfaceById("saved-clock");
-assert.deepEqual(selectedIds, [60002], "selecting a saved clock must switch the device immediately");
+assert.deepEqual(restoredIds, ["saved-clock"], "opening a saved design restores its current local content");
+assert.equal(loadContext.activeLocalWatchfaceId, "saved-clock");
+assert.deepEqual(selectedIds, [], "the list click handles device selection separately from restoring the workspace");
 
 let bindings = normalizeDeviceClockBindings({ config: { ClockId: 60003 } }, 300426474);
 assert.equal(getDeviceClockId(bindings, 300426474), 60003, "legacy ClockId migrates only to the selected device");

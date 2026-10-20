@@ -6,7 +6,7 @@ The device-side protocol is defined by the AstroToo firmware source at `Z:/allwi
 
 Select a real LAN device. A design without a device `ClockId` shows **Create watchface**; one with an ID shows **Apply watchface config** in the same button position. The button is disabled when the configuration has not changed. After creation, choose **Upload Watchface**. A square APP preview image no larger than 500×500 pixels is required. The PC tool converts it to WebP before upload. In the confirmation dialog, choose whether to share with other users. Public uploads require one template category and administrator approval; private uploads remain visible only to the owner. An unchanged watchface cannot be uploaded again.
 
-After the first successful upload, the PC tool records online upload state against the `DeviceId` and `ClockId` pair, and the button becomes **Update online watchface**. An update requires a description, submitted in `MessageInfo`. The dialog retains the previous sharing choice and category but lets the user change them.
+After the first successful upload, the PC tool records online upload state against the `DeviceId` and `ClockId` pair, and the button becomes **Update online watchface**. Watchfaces synced from the device are also recognized as updates using server records, with the server's sharing choice and category restored in the dialog. Updates require a description, submitted in `MessageInfo`. Even without content changes, the update dialog can change sharing with other users or the category. Submissions with unchanged content and sharing settings are blocked.
 
 The device firmware must support `SupportsClockShare`. The PC tool uses real devices by default; the simulator switch remains in `src/editor/simulatedDevice.js`.
 
@@ -17,7 +17,7 @@ For each saved design, the left list looks up the `ClockId` bound to the selecte
 | Server `Status` | List label | Meaning |
 | --- | --- | --- |
 | No bound ID or online record | Local | No matching online record for this device. |
-| `0` | Local | Uploaded but not public; the tooltip clarifies this. |
+| `0` | Only you | Uploaded but private. |
 | `1` | Awaiting you | Public review awaits a user reply. |
 | `2` | Pending review | Public review awaits the administrator. |
 | `3` | Published | Approved and visible to other users. |

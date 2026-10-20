@@ -148,34 +148,16 @@
       <section class="template-browse-card" id="template-browse-card">
         <div class="template-browse-head">
           <div>
-            <h2 id="lbl-template-category">模板分类</h2>
+            <h2 id="lbl-template-category">内置模板</h2>
             <div id="template-hint" class="template-browse-hint"></div>
           </div>
           <div class="btn-row sidebar-template-actions">
-            <button id="btn-view-pending-templates" type="button" class="btn-ghost btn-view-pending-templates" hidden></button>
-            <button id="btn-sync-templates" type="button" class="btn-ghost btn-sync-templates"></button>
             <button id="btn-apply-template" type="button" class="btn-primary"></button>
           </div>
-          <div id="template-sync-status" class="template-sync-status" hidden aria-live="polite"></div>
         </div>
-        <select id="select-template-category" hidden></select>
-        <div id="template-category-rail" class="template-category-rail" role="tablist" aria-label="模板分类"></div>
         <ul id="template-list" class="template-list template-list-with-thumb template-list-fill"></ul>
       </section>
 
-      <section class="template-pending-card" id="template-pending-card" hidden>
-        <div class="template-browse-head">
-          <div>
-            <h2 id="lbl-template-pending">待下载模板</h2>
-            <div id="template-pending-hint" class="template-browse-hint"></div>
-          </div>
-          <div class="btn-row sidebar-template-actions">
-            <button id="btn-template-pending-back" type="button" class="btn-ghost"></button>
-          </div>
-        </div>
-        <div id="template-pending-category-rail" class="template-category-rail" role="tablist" aria-label="待下载模板分类"></div>
-        <ul id="template-pending-list" class="template-list template-list-with-thumb template-list-fill template-pending-list"></ul>
-      </section>
     </aside>
 
     <section class="panel center-panel">
@@ -269,6 +251,7 @@
         <small id="lan-upload-classify-error" class="lan-upload-message-error" role="alert" hidden></small>
       </label>
       <p id="lan-upload-review-note" class="lan-upload-review-note" aria-live="polite"></p>
+      <p id="lan-upload-unchanged-error" class="lan-upload-message-error" role="alert" hidden></p>
       <div class="lan-dialog-actions">
         <button type="button" id="lan-upload-cancel" class="btn-ghost"></button>
         <button type="submit" id="lan-upload-submit" class="btn-primary"></button>
@@ -304,7 +287,7 @@
     </div>
   </dialog>
 
-  <dialog id="about-dialog" class="lan-dialog about-dialog">
+  <dialog id="about-dialog" class="lan-dialog about-dialog" aria-labelledby="about-title">
     <h3 id="about-title" class="lan-dialog-title"></h3>
     <div
       id="about-doubleclick-zone"
@@ -348,14 +331,24 @@
     <p id="template-download-status" class="template-download-status" aria-live="polite"></p>
   </dialog>
 
-  <dialog id="admin-password-dialog" class="lan-dialog admin-password-dialog">
-    <h3 id="admin-password-title" class="lan-dialog-title"></h3>
-    <p id="admin-password-caption" class="hint"></p>
+  <dialog id="admin-password-dialog" class="lan-dialog admin-password-dialog" aria-labelledby="admin-password-title" aria-describedby="admin-password-caption">
+    <div class="admin-password-header">
+      <span class="admin-password-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="10" width="14" height="11" rx="3" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" />
+        </svg>
+      </span>
+      <div>
+        <h3 id="admin-password-title" class="lan-dialog-title"></h3>
+        <p id="admin-password-caption" class="admin-password-caption"></p>
+      </div>
+    </div>
     <label class="lan-dialog-field" id="admin-password-field-row">
       <span id="admin-password-label-text"></span>
-      <input id="admin-password-input" type="password" autocomplete="off" maxlength="128" />
+      <input id="admin-password-input" type="password" autocomplete="off" maxlength="128" aria-describedby="admin-password-status" autofocus />
     </label>
-    <p id="admin-password-status" class="hint admin-password-status" aria-live="polite"></p>
+    <p id="admin-password-status" class="admin-password-status" aria-live="polite"></p>
     <div class="lan-dialog-actions">
       <button type="button" id="admin-password-cancel" class="btn-ghost"></button>
       <button type="button" id="admin-password-submit" class="btn-primary"></button>

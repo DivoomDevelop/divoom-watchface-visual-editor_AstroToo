@@ -37,6 +37,19 @@ export function encodeAppPreviewWebp(image, { documentRef = globalThis.document,
   });
 }
 
+export function deviceUploadStateFromClock(clock) {
+  const clockId = positiveInt(clock?.ClockId);
+  const status = clock?.Status == null ? NaN : Number(clock.Status);
+  if (!clockId || !Number.isInteger(status) || status < 0 || status > 4) return null;
+  return {
+    clockId,
+    shareToOthers: status > 0,
+    classifyId: positiveInt(clock.ClassifyId),
+    uploadedAt: 0,
+    messageInfo: String(clock.MessageInfo || "").slice(0, 500)
+  };
+}
+
 export function normalizeDeviceUploadStates(record) {
   const normalized = {};
   const stored = record?.deviceUploadStates;

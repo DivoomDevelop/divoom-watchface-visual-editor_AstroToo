@@ -2,6 +2,7 @@ import { downloadAssetBytes, extFromAssetPath, extFromImageBytes } from "./cdnAs
 import { saveClassifyCacheViaApi, writeDevFileViaApi } from "./devSyncApi.js";
 import { collectFontIdsFromClockInfo, syncMissingFontsFromDevice } from "./fontSync.js";
 import { firstDivoomJpegGifFrame } from "./divoomJpegGif.js";
+import { templateElementAssetStem } from "./templateElementAssets.js";
 
 export {
   DIVOOM_CDN_BASE,
@@ -339,7 +340,7 @@ export function planTemplateAssetWrites(clockId, clockInfo, { getSlotByItem, isI
     if (!addr || /^https?:\/\//i.test(addr)) continue;
     const slot = getSlotByItem(id, item);
     if (!Number.isFinite(slot) || slot <= 0) continue;
-    queueUrl(`template/29/${slot}${extFromAssetPath(addr)}`, addr);
+    queueUrl(`template/29/${templateElementAssetStem(slot)}${extFromAssetPath(addr)}`, addr);
   }
 
   return writes;

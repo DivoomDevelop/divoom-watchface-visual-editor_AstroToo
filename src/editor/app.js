@@ -1,3 +1,4 @@
+import { legacyTemplateElementSlot, templateElementAssetStem } from "./templateElementAssets.js";
 import {
   LANGUAGE_OPTIONS,
   DEFAULT_LANGUAGE_ENUM,
@@ -42,6 +43,7 @@ import {
 } from "./deviceClockBindings.js";
 import { deleteWatchfaceRemoteBindings, watchfaceDeletionTargets } from "./watchfaceDeletion.js";
 import {
+  deviceUploadStateFromClock,
   encodeAppPreviewWebp,
   getDeviceUploadState,
   normalizeDeviceUploadStates,
@@ -592,7 +594,57 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     489: "NEXT_FOURTH_HOUR_TEMP",
     490: "MUSIC_SINGER",
     491: "MUSIC_PREV_WORD",
-    492: "BATTERY"
+    492: "BATTERY",
+    493: "TIME_ZONE",
+    494: "EXCHANGE_FLAG_SMALL",
+    495: "STOCK_TREND_PIC",
+    496: "DYNAMIC_COMPONET",
+    497: "AI_EMOJI",
+    498: "AI_TEXT",
+    499: "NEXT_EVENT_TITLE",
+    500: "NEXT_EVENT_TIME",
+    501: "NEXT_EVENT_REMAINING",
+    502: "NEXT_EVENT_COUNTDOWN",
+    503: "NEXT_EVENT_COLOR",
+    504: "GOOGLE_CALENDAR_HEATMAP",
+    505: "AI_BACKGROUD",
+    506: "NEXT_EVENT_ACTIVE_MARK",
+    507: "TODAY_ACTIVITIES",
+    508: "DIAL_SPECIAL_ITEM1",
+    510: "DIAL_FOUR_DOT_IMAGE_ITEM1",
+    511: "DIAL_FOUR_DOT_IMAGE_ITEM2",
+    512: "DIAL_AI_TEXT_ITEM2",
+    513: "WORK_MODE_IMAGE",
+    514: "VOLUME_IMAGE",
+    515: "WEATHER_PART_IMAGE",
+    516: "HOT128_IMAGE",
+    517: "WEBP2_TEXT",
+    518: "ALARM_TITLE",
+    519: "ALARM_COUNTDOWN",
+    520: "ALARM_TIME",
+    521: "DAILY_SENTENCE",
+    522: "COUNT_UP_SECOND",
+    523: "NEXT_SOLAR_TERM_IMAGE",
+    524: "NEXT_SOLAR_TERM_COUNTDOWN",
+    525: "SPRING_FESTIVAL_COUNTDOWN",
+    526: "AMPM_BIG",
+    527: "WEBP2_WEATHER",
+    528: "WEBP3_WEATHER",
+    529: "FOUR_SEASON_IMAGE",
+    530: "PHASE_MOON_NAME_EN",
+    531: "THREE_MUSIC_WORD",
+    532: "POETRY_SHORT",
+    533: "HOT_IMAGE_DISP_TIME",
+    534: "CALENDAR_WATCH20",
+    535: "MONTH_CN_SOLAR",
+    536: "FINANCE_TREND_PIC",
+    537: "DAILY_SENTENCE_PIC",
+    538: "FULL_SCREEN_LYRICS",
+    539: "CALENDAR_WATCH21",
+    540: "TOMMOROW_WEEK_GIF",
+    541: "AFTER_TOM_WEEK_GIF",
+    542: "THREE_DAY_WEEK_GIF",
+    543: "FOUR_DAY_WEEK_GIF"
   });
 
   const DISP_COMMENT_ZH_MAP = Object.freeze({
@@ -1092,7 +1144,16 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     531: "三行歌词",
     532: "诗词短句",
     533: "显示时间",
-    534: "日历表显示20(231*148、星期显示为日，一...六)"
+    534: "日历表显示20(231*148、星期显示为日，一...六)",
+    535: "中文月份（一月）阳历",
+    536: "金融涨跌图片（2帧：涨/跌，国内外一致）",
+    537: "每日一句（30个短句图片随机）",
+    538: "全屏歌词",
+    539: "日历表显示21(231*148、星期显示为日，月...土)",
+    540: "明天星期图像（7帧，周一到周日）",
+    541: "后天星期图像（7帧，周一到周日）",
+    542: "大后天星期图像（7帧，周一到周日）",
+    543: "后后天星期图像（7帧，周一到周日）"
   });
 
   const IMAGE_DISP_IDS = new Set([
@@ -1104,7 +1165,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     285, 286, 287, 288, 289, 290, 297, 298, 310, 348, 349, 350, 352, 359, 364, 390, 391, 394, 395, 396,
     403, 421, 423, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445,
     446, 447, 454, 455, 456, 459, 461, 462, 463, 464, 465, 470, 471, 472, 473, 475, 480, 481, 482, 483,
-    484, 492, 494, 495, 497, 504, 505, 506, 508, 510, 511, 513, 514, 515, 516, 523, 527, 528, 529
+    484, 492, 494, 495, 497, 504, 505, 506, 508, 510, 511, 513, 514, 515, 516, 523, 527, 528, 529, 536,
+    537, 540, 541, 542, 543
   ]);
 
   /** DIVOOM_CLOCK_DISP_SUPPORT_ROTAETE_IMAGE1..4 —— divoom_disp_clock.c / dial_menu ROTATE_IMAGE（mul_flag=0） */
@@ -1145,7 +1207,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   const MULTI_LINE_DISP_IDS = new Set([56, 154, 155, 104, 220]);
   const APP_DATA_DISP_IDS = new Set([16, 38, 40, 41, 42, 99, 100, 112, 113, 114, 115, 116, 117, 246, 247, 248]);
   const PREVIEW_TICK_MS = 100;
-  const TEMPLATE_IMAGE_SLOT_COUNT = 128;
+  const TEMPLATE_IMAGE_SLOT_COUNT = 256;
   const TEMPLATE_SCAN_CONCURRENCY = 16;
   const TEMPLATE_NAME_SCAN_CONCURRENCY = 8;
   const TEMPLATE_SCAN_MIN_ID = 1;
@@ -1157,6 +1219,27 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   const TEMPLATE_PREVIEW_DIR_33 = withBase("template/33/");
   const TEMPLATE_ORGANIZE_REPORT_PATH = withBase("template/organize-report.json");
   const TEMPLATE_CLASSIFY_CACHE_PATH = withBase("template/classify-cache.json");
+  let bundledTemplateCatalog = { ClockList: [] };
+
+  function bundledTemplateRow(clockId) {
+    return bundledTemplateCatalog.ClockList.find((row) => Number(row.ClockId) === Number(clockId));
+  }
+
+  function bundledTemplateAssetPath(clockId, address) {
+    const assets = bundledTemplateRow(clockId)?.assets || {};
+    const rel = assets[address] || Object.values(assets).find((path) => basename(path) === address);
+    return rel ? withBase(rel) : "";
+  }
+
+  async function loadBundledTemplateAsset(clockId, address) {
+    const path = bundledTemplateAssetPath(clockId, address);
+    if (!path) return { asset: null, path: "" };
+    try {
+      return { asset: await loadLocalAssetFromUrl(path), path };
+    } catch {
+      return { asset: null, path };
+    }
+  }
   const TEMPLATE_BG_EXT_CANDIDATES = [".bin", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
   const TEMPLATE_PREVIEW_EXT_CANDIDATES = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bin"];
   const TEMPLATE_IMG_EXT_CANDIDATES = [".bin", ".png", ".webp", ".gif", ".jpg", ".jpeg"];
@@ -1264,144 +1347,150 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
   // 固件映射：disp -> slot offset（来源 src/middle/divoom_clock_manage.c 的 gdivoom_disp_image_item_table）
   const TEMPLATE_DISP_OFFSET_TABLE = Object.freeze({
-    13: 42,
-    18: 17,
+    13: 29,
+    18: 11,
     46: 0,
     47: 1,
     48: 2,
-    55: 16,
+    55: 10,
     57: 3,
     58: 4,
-    59: 11,
-    60: 12,
-    61: 13,
-    62: 14,
-    63: 15,
-    64: 18,
-    66: 22,
-    67: 23,
-    68: 24,
-    69: 25,
-    70: 26,
-    71: 27,
-    72: 28,
-    73: 29,
-    74: 32,
-    78: 34,
-    79: 35,
-    81: 36,
-    85: 37,
-    89: 38,
-    93: 39,
-    98: 43,
-    105: 44,
-    107: 45,
-    108: 46,
-    124: 47,
-    125: 52,
-    126: 53,
-    127: 54,
-    128: 55,
-    129: 56,
-    130: 57,
-    131: 6,
-    132: 7,
-    171: 48,
-    172: 30,
-    173: 49,
-    174: 50,
-    175: 51,
-    182: 33,
-    206: 58,
-    207: 60,
-    208: 61,
-    209: 62,
-    210: 63,
-    211: 65,
-    212: 66,
-    217: 64,
-    218: 59,
-    233: 5,
-    234: 82,
-    240: 19,
-    260: 21,
-    281: 67,
-    282: 68,
-    283: 69,
-    284: 70,
-    285: 71,
-    286: 72,
-    287: 73,
-    288: 74,
-    289: 75,
-    290: 76,
-    297: 40,
-    298: 41,
-    310: 31,
-    348: 77,
-    349: 78,
-    350: 79,
-    352: 80,
-    359: 81,
-    364: 10,
-    390: 8,
-    391: 9,
-    394: 85,
-    395: 86,
-    396: 87,
-    403: 104,
-    421: 105,
-    423: 106,
-    429: 88,
-    430: 89,
-    431: 90,
-    432: 91,
-    433: 92,
-    434: 93,
-    435: 94,
-    436: 95,
-    437: 96,
-    438: 97,
-    439: 98,
-    440: 99,
-    441: 100,
-    442: 101,
-    443: 102,
-    444: 103,
-    445: 20,
-    446: 83,
-    447: 84,
-    454: 108,
-    455: 107,
-    456: 109,
-    459: 110,
-    461: 111,
-    462: 112,
-    463: 113,
-    464: 114,
-    470: 116,
-    471: 115,
-    472: 117,
+    59: 5,
+    60: 6,
+    61: 7,
+    62: 8,
+    63: 9,
+    64: 12,
+    66: 13,
+    67: 14,
+    68: 16,
+    69: 17,
+    70: 18,
+    71: 19,
+    72: 20,
+    73: 21,
+    74: 22,
+    78: 23,
+    79: 24,
+    81: 25,
+    85: 26,
+    89: 27,
+    93: 28,
+    98: 30,
+    105: 31,
+    107: 32,
+    108: 33,
+    124: 34,
+    125: 39,
+    126: 40,
+    127: 41,
+    128: 42,
+    129: 43,
+    130: 44,
+    131: 46,
+    132: 47,
+    171: 35,
+    172: 72,
+    173: 36,
+    174: 37,
+    175: 38,
+    182: 58,
+    206: 48,
+    207: 49,
+    208: 50,
+    209: 51,
+    210: 52,
+    211: 53,
+    212: 54,
+    217: 55,
+    218: 56,
+    233: 45,
+    234: 79,
+    240: 57,
+    260: 59,
+    281: 60,
+    282: 61,
+    283: 62,
+    284: 63,
+    285: 64,
+    286: 65,
+    287: 66,
+    288: 67,
+    289: 68,
+    290: 69,
+    297: 70,
+    298: 71,
+    310: 73,
+    348: 74,
+    349: 75,
+    350: 76,
+    352: 77,
+    359: 78,
+    364: 82,
+    390: 80,
+    391: 81,
+    394: 86,
+    395: 87,
+    396: 88,
+    403: 83,
+    421: 84,
+    423: 85,
+    429: 92,
+    430: 93,
+    431: 94,
+    432: 95,
+    433: 96,
+    434: 97,
+    435: 98,
+    436: 99,
+    437: 100,
+    438: 101,
+    439: 102,
+    440: 103,
+    441: 104,
+    442: 105,
+    443: 106,
+    444: 107,
+    445: 89,
+    446: 90,
+    447: 91,
+    454: 109,
+    455: 108,
+    456: 110,
+    459: 111,
+    461: 112,
+    462: 113,
+    463: 114,
+    464: 115,
+    470: 117,
+    471: 116,
+    472: 119,
     473: 118,
-    475: 119,
-    480: 124,
-    481: 120,
+    475: 120,
+    480: 125,
+    481: 121,
     482: 122,
     483: 123,
-    484: 121,
-    492: 125,
-    495: 128,
-    505: 126,
-    508: 131,
-    510: 132,
-    511: 133,
-    513: 134,
-    514: 135,
-    515: 136,
-    523: 111,
-    527: 129,
-    528: 130,
-    529: 137
+    484: 124,
+    492: 126,
+    495: 129,
+    505: 127,
+    508: 133,
+    510: 134,
+    511: 135,
+    513: 136,
+    514: 137,
+    515: 138,
+    523: 112,
+    527: 131,
+    528: 132,
+    529: 139,
+    536: 130,
+    537: 140,
+    540: 141,
+    541: 142,
+    542: 143,
+    543: 144
   });
 
   const LOCAL_ASSET_DISP_RULES = new Map([
@@ -1532,7 +1621,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     [484, { mode: "multiple", value: 10 }],
     [492, { mode: "multiple", value: 10 }],
     [494, { mode: "any" }],
-    [495, { mode: "any" }],
+    [495, { mode: "multiple", value: 4 }],
     [497, { mode: "any" }],
     [504, { mode: "any" }],
     [505, { mode: "any" }],
@@ -1547,7 +1636,13 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     [523, { mode: "multiple", value: 24 }],
     [527, { mode: "multiple", value: 10 }],
     [528, { mode: "multiple", value: 10 }],
-    [529, { mode: "multiple", value: 4 }]
+    [529, { mode: "multiple", value: 4 }],
+    [536, { mode: "multiple", value: 2 }],
+    [537, { mode: "multiple", value: 30 }],
+    [540, { mode: "multiple", value: 7 }],
+    [541, { mode: "multiple", value: 7 }],
+    [542, { mode: "multiple", value: 7 }],
+    [543, { mode: "multiple", value: 7 }]
   ]);
 
   const DEFAULT_ITEM = Object.freeze({
@@ -2209,7 +2304,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       case 62:
         return now.getMinutes() % 10;
       case 66:
-        return now.getDay();
+        return (now.getDay() + 6) % 7;
+      case 540:
+      case 541:
+      case 542:
+      case 543:
+        return (now.getDay() + 6 + toNum(disp, 0) - 539) % 7;
       case 68:
         return now.getSeconds();
       case 69:
@@ -2263,6 +2363,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       case 528:
         return Math.floor(now.getSeconds() / 6) % 10;
       case 310:
+      case 495:
+      case 536:
         return 0;
       case 454:
       case 462:
@@ -2286,6 +2388,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         return (day - 1) % 24;
       case 529:
         return Math.min(3, Math.floor((mon - 1) / 3));
+      case 537:
+        return (day - 1) % 30;
       default:
         return -1;
     }
@@ -2914,9 +3018,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       if (!candidates.length) return;
 
       (async () => {
-        const basePaths = Array.isArray(runtime.fontBasePaths) && runtime.fontBasePaths.length
+        let basePaths = Array.isArray(runtime.fontBasePaths) && runtime.fontBasePaths.length
           ? runtime.fontBasePaths
           : [withBase("font/")];
+        if (bundledTemplateCatalog.fontOverrides?.[fontId]) {
+          basePaths = [withBase("template/demo/fonts/"), ...basePaths];
+        }
         for (const local of candidates) {
           for (const base of basePaths) {
             try {
@@ -3199,6 +3306,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     lanUploadClassifyHint: byId("lan-upload-classify-hint"),
     lanUploadClassifyError: byId("lan-upload-classify-error"),
     lanUploadReviewNote: byId("lan-upload-review-note"),
+    lanUploadUnchangedError: byId("lan-upload-unchanged-error"),
     lanUploadCancel: byId("lan-upload-cancel"),
     lanUploadSubmit: byId("lan-upload-submit"),
     lanReviewDialog: byId("lan-review-dialog"),
@@ -3563,7 +3671,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     }
     const imageId = toNum(item?.image_id, 0);
     if (imageId > 0 && imageId <= TEMPLATE_IMAGE_SLOT_COUNT) {
-      // image_id 在部分配置中可能直接是 1..128 槽位编号。
+      // image_id 在部分配置中可能直接是 1..TEMPLATE_IMAGE_SLOT_COUNT 槽位编号。
       return clockId * TEMPLATE_IMAGE_SLOT_COUNT + imageId;
     }
     if (imageId > TEMPLATE_IMAGE_SLOT_COUNT) {
@@ -3752,8 +3860,12 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       dom.adminPasswordInput.value = "";
       dom.adminPasswordInput.disabled = unlocked;
       dom.adminPasswordInput.required = !unlocked;
+      dom.adminPasswordInput.removeAttribute("aria-invalid");
     }
-    if (dom.adminPasswordStatus) dom.adminPasswordStatus.textContent = "";
+    if (dom.adminPasswordStatus) {
+      dom.adminPasswordStatus.textContent = "";
+      delete dom.adminPasswordStatus.dataset.state;
+    }
     if (dom.adminPasswordCancel) setNodeText(dom.adminPasswordCancel, t("lan.dialog.cancel"));
     if (dom.adminPasswordSubmit)
       setNodeText(dom.adminPasswordSubmit, unlocked ? t("about.adminPwdOk") : t("about.adminPwdSubmit"));
@@ -3842,18 +3954,28 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
           persistAdminUnlock(true);
           syncAdminUnlockUi();
           refreshTemplateSyncUi();
-          if (dom.adminPasswordStatus)
+          dom.adminPasswordInput?.removeAttribute("aria-invalid");
+          if (dom.adminPasswordStatus) {
             dom.adminPasswordStatus.textContent = t("about.adminPwdSuccess");
+            dom.adminPasswordStatus.dataset.state = "success";
+          }
           fontStore.log(t("about.adminUnlocked"));
           window.setTimeout(() => closeGate(), 450);
           return;
         }
         if (dom.adminPasswordStatus)
           dom.adminPasswordStatus.textContent = t("about.adminPwdWrong");
+        dom.adminPasswordInput?.setAttribute("aria-invalid", "true");
+        dom.adminPasswordInput?.focus();
+        dom.adminPasswordInput?.select();
       });
     }
 
     if (dom.adminPasswordInput && dom.adminPasswordSubmit) {
+      dom.adminPasswordInput.addEventListener("input", () => {
+        dom.adminPasswordInput.removeAttribute("aria-invalid");
+        if (dom.adminPasswordStatus) dom.adminPasswordStatus.textContent = "";
+      });
       dom.adminPasswordInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -3961,6 +4083,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     if (dom.lanUploadClassifyLabel) setNodeText(dom.lanUploadClassifyLabel, t("lan.upload.classifyLabel"));
     if (dom.lanUploadClassifyHint) setNodeText(dom.lanUploadClassifyHint, t("lan.upload.classifyHint"));
     if (dom.lanUploadClassifyError) setNodeText(dom.lanUploadClassifyError, t("lan.upload.classifyRequired"));
+    if (dom.lanUploadUnchangedError) setNodeText(dom.lanUploadUnchangedError, t("lan.upload.unchanged"));
     if (dom.lanUploadCancel) setNodeText(dom.lanUploadCancel, t("lan.upload.cancel"));
     refreshLanUploadDialogReviewNote();
     if (dom.lanCreateTitle) setNodeText(dom.lanCreateTitle, t("lan.dialog.confirmCreateTitle"));
@@ -4274,6 +4397,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
   function refreshTemplateCategorySelectorUi() {
     syncTemplateDomRefs();
+    if (!dom.selectTemplateCategory && !dom.templateCategoryRail) return;
     const previousSelected = toNum(templateState.selectedClassifyId, NaN);
     if (dom.selectTemplateCategory) dom.selectTemplateCategory.innerHTML = "";
     if (dom.templateCategoryRail) dom.templateCategoryRail.innerHTML = "";
@@ -4383,6 +4507,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       NameCn: String(raw?.NameCn ?? "").trim(),
       NameEn: String(raw?.NameEn ?? "").trim(),
       AppImageUrl: String(raw?.AppImageUrl ?? "").trim(),
+      DeviceImageUrl: String(raw?.DeviceImageUrl ?? "").trim(),
+      DevPreviewSmallImgUrl: String(raw?.DevPreviewSmallImgUrl ?? raw?.DevicePreviewImageUrl ?? "").trim(),
       ClockId: toNum(raw?.ClockId, fallbackId)
     };
   }
@@ -4396,6 +4522,11 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function templateThumbnailSourcesForId(id) {
+    if (bundledTemplateRow(id)) {
+      const meta = templateState.metaById.get(id);
+      return [...new Set([meta?.AppImageUrl, meta?.DevPreviewSmallImgUrl, meta?.DeviceImageUrl]
+        .map((addr) => bundledTemplateAssetPath(id, addr)).filter(Boolean))];
+    }
     const appImageUrl = templateAppImageUrl(id);
     return templateThumbnailSources(id, {
       previewDir: TEMPLATE_PREVIEW_DIR_33,
@@ -4669,10 +4800,15 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function activeOnlineUploadState() {
+    const deviceId = resolveClockBindingDeviceId();
+    const clockId = toNum(state.config?.ClockId, 0);
+    const cached = localWatchClockStatusByDevice.get(deviceId);
+    const online = cached?.phase === "ready" ? cached.uploadStates?.get(clockId) : null;
+    if (online) return online;
     return getDeviceUploadState(
       activeDeviceUploadStates,
-      resolveClockBindingDeviceId(),
-      toNum(state.config?.ClockId, 0)
+      deviceId,
+      clockId
     );
   }
 
@@ -4717,12 +4853,17 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         .filter((row) => Number(row?.ClockId) > 0)
         .map((row) => [Number(row.ClockId), row.Status == null ? NaN : Number(row.Status)]));
       if (localWatchClockStatusByDevice.get(deviceId)?.seq !== seq) return;
-      localWatchClockStatusByDevice.set(deviceId, { phase: "ready", seq, statuses });
+      const uploadStates = new Map(data.ClockList.map((row) =>
+        [Number(row?.ClockId), deviceUploadStateFromClock(row)]));
+      localWatchClockStatusByDevice.set(deviceId, { phase: "ready", seq, statuses, uploadStates });
     } catch (error) {
       if (localWatchClockStatusByDevice.get(deviceId)?.seq !== seq) return;
       localWatchClockStatusByDevice.set(deviceId, { phase: "error", seq, error: errorToText(error) });
     }
-    if (resolveClockBindingDeviceId() === deviceId) refreshLocalWatchfaceListUi();
+    if (resolveClockBindingDeviceId() === deviceId) {
+      refreshLocalWatchfaceListUi();
+      refreshLanActionButtons();
+    }
   }
 
   async function syncSelectedDeviceWatchfaces() {
@@ -4845,9 +4986,14 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         phase: "ready", seq: ++localWatchStatusRequestSeq,
         statuses: new Map(clockResult.value.ClockList
           .filter((row) => Number(row?.ClockId) > 0)
-          .map((row) => [Number(row.ClockId), row.Status == null ? NaN : Number(row.Status)]))
+          .map((row) => [Number(row.ClockId), row.Status == null ? NaN : Number(row.Status)])),
+        uploadStates: new Map(clockResult.value.ClockList.map((row) =>
+          [Number(row?.ClockId), deviceUploadStateFromClock(row)]))
       });
-      if (resolveClockBindingDeviceId() === deviceId) refreshLocalWatchfaceListUi();
+      if (resolveClockBindingDeviceId() === deviceId) {
+        refreshLocalWatchfaceListUi();
+        refreshLanActionButtons();
+      }
       const clock = clockResult.value.ClockList.find((row) => Number(row?.ClockId) === clockId);
       if (!clock) next.statusPhase = "missing";
       else next.statusCode = clock.Status == null ? NaN : Number(clock.Status);
@@ -4883,7 +5029,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       setNodeText(createBtn, t(hasClockId ? "ui.btn.lanApplyWatchfaceConfig" : "ui.btn.lanCreate"));
     }
     if (dom.btnLanShareWatchface) {
-      dom.btnLanShareWatchface.disabled = !canUseLan || !hasClockId || !hasLanUploadChanges();
+      dom.btnLanShareWatchface.disabled = !canUseLan || !hasClockId ||
+        (!hasLanUploadChanges() && !activeOnlineUploadState());
       dom.btnLanShareWatchface.setAttribute("aria-busy", lanShareBusy ? "true" : "false");
       setNodeText(dom.btnLanShareWatchface, t(lanShareBusy ? "lan.share.busy" : lanUploadButtonTranslationKey()));
     }
@@ -5406,8 +5553,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     sidebarBrowseMode = "template";
     refreshSidebarBrowseChrome();
 
-    const selectedClassify = getSelectedTemplateClassifyRow();
-    const filtered = selectedClassify ? [...selectedClassify.availableIds] : [];
+    const filtered = [...templateState.ids];
 
     if (!filtered.length) {
       templateState.activeClockId = null;
@@ -6612,22 +6758,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   async function loadTemplateClassifyCache() {
     try {
       const data = await fetchJson(TEMPLATE_CLASSIFY_CACHE_PATH);
-      let merged = mergeClassifyCatalogSnapshots(TEMPLATE_CLASSIFY_FALLBACK, data);
-      merged = await enrichTemplateClassifyNamesFromStore(merged);
+      const merged = mergeClassifyCatalogSnapshots(TEMPLATE_CLASSIFY_FALLBACK, data);
       setTemplateClassifyDataRuntime(merged);
-      const shouldRewriteDisk =
-        classifyCatalogNeedsNameEnrichment(data) ||
-        countClassifyCatalogClockIds(data) <
-          countClassifyCatalogClockIds(TEMPLATE_CLASSIFY_FALLBACK) * 0.9;
-      if (shouldRewriteDisk) {
-        try {
-          if (await isDevSyncApiAvailable()) {
-            await saveClassifyCacheViaApi(merged);
-          }
-        } catch {
-          /* 非 dev 或写入失败时仍保留内存中的合并结果 */
-        }
-      }
     } catch {
       /* 使用内置 TEMPLATE_CLASSIFY_FALLBACK */
     }
@@ -6646,25 +6778,6 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   function refreshTemplateSyncUi() {
-    syncTemplateDomRefs();
-    const btn = dom.btnSyncTemplates;
-    if (!btn) return;
-    btn.hidden = pendingTemplateState.active;
-    btn.title = t("template.btn.syncTitle");
-    setNodeText(btn, t("template.btn.sync"));
-    const hasStoreDeviceId = resolveStoreApiDeviceId() > 0;
-    const busy = templateSyncState.scanning || pendingTemplateState.scanning || pendingTemplateState.downloading;
-    btn.disabled = busy || !hasStoreDeviceId;
-    refreshViewPendingButtonUi();
-    if (templateSyncState.scanning || pendingTemplateState.scanning) {
-      setTemplateSyncStatusText(
-        t("template.sync.scanning", { message: templateSyncState.message || pendingTemplateState.scanMessage || "…" })
-      );
-    } else if (templateSyncState.error) {
-      setTemplateSyncStatusText(templateSyncState.error, "error");
-    } else if (!pendingTemplateState.active) {
-      setTemplateSyncStatusText("");
-    }
     refreshFontSyncButtonUi();
     refreshDispSyncButtonUi();
   }
@@ -8706,14 +8819,13 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     dom.inputAppPreviewFile?.focus?.();
   }
 
-  function openLanUploadConfirmDialog({ isUpdate, previousShareToOthers, previousClassifyId }) {
+  function openLanUploadConfirmDialog({ isUpdate, previousShareToOthers, previousClassifyId, hasContentChanges = true }) {
     const name = resolveLanDeviceCreateClockName();
     const dlg = dom.lanUploadDialog;
     const form = dom.lanUploadForm;
     if (!dlg || !form) {
-      return Promise.resolve(window.confirm(t(
-        isUpdate ? "lan.upload.updateBody" : "lan.upload.confirmBody", { name }
-      )) ? { shareToOthers: false, classifyId: 0, messageInfo: "" } : null);
+      alert(t("lan.upload.dialogUnavailable"));
+      return Promise.resolve(null);
     }
     setNodeText(dom.lanUploadTitle, t(isUpdate ? "lan.upload.updateTitle" : "lan.upload.confirmTitle"));
     setNodeText(dom.lanUploadBody, t(isUpdate ? "lan.upload.updateBody" : "lan.upload.confirmBody", { name }));
@@ -8729,6 +8841,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     populateLanUploadClassifyOptions(previousClassifyId);
     if (dom.lanUploadClassify) dom.lanUploadClassify.setAttribute("aria-invalid", "false");
     if (dom.lanUploadClassifyError) dom.lanUploadClassifyError.hidden = true;
+    if (dom.lanUploadUnchangedError) dom.lanUploadUnchangedError.hidden = true;
     if (dom.lanUploadSubmit) setNodeText(dom.lanUploadSubmit,
       t(isUpdate ? "lan.upload.updateSubmit" : "lan.upload.submit"));
     refreshLanUploadDialogReviewNote();
@@ -8738,6 +8851,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         form.removeEventListener("submit", onSubmit);
         dom.lanUploadCancel?.removeEventListener("click", onCancel);
         dom.lanUploadSharePublic?.removeEventListener("change", refreshLanUploadDialogReviewNote);
+        dom.lanUploadSharePublic?.removeEventListener("change", clearUnchangedError);
         dom.lanUploadMessage?.removeEventListener("input", onMessageInput);
         dom.lanUploadMessage?.removeEventListener("invalid", onMessageInvalid);
         dom.lanUploadClassify?.removeEventListener("change", onClassifyChange);
@@ -8749,6 +8863,9 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         resolve(value);
       };
       const onCancel = () => finish(null);
+      const clearUnchangedError = () => {
+        if (dom.lanUploadUnchangedError) dom.lanUploadUnchangedError.hidden = true;
+      };
       const onDialogCancel = (event) => {
         event.preventDefault();
         finish(null);
@@ -8764,6 +8881,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         dom.lanUploadClassify?.setAttribute("aria-invalid", visible ? "true" : "false");
       };
       const onClassifyChange = () => {
+        clearUnchangedError();
         setClassifyErrorVisible(false);
         if (dom.lanUploadClassify) {
           dom.lanUploadClassify.title = dom.lanUploadClassify.selectedOptions?.[0]?.textContent || "";
@@ -8784,6 +8902,11 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
           dom.lanUploadClassify?.focus?.();
           return;
         }
+        if (isUpdate && !hasContentChanges && shareToOthers === previousShareToOthers &&
+            (!shareToOthers || classifyId === previousClassifyId)) {
+          if (dom.lanUploadUnchangedError) dom.lanUploadUnchangedError.hidden = false;
+          return;
+        }
         finish({
           shareToOthers,
           classifyId: shareToOthers ? classifyId : 0,
@@ -8793,6 +8916,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       form.addEventListener("submit", onSubmit);
       dom.lanUploadCancel?.addEventListener("click", onCancel);
       dom.lanUploadSharePublic?.addEventListener("change", refreshLanUploadDialogReviewNote);
+      dom.lanUploadSharePublic?.addEventListener("change", clearUnchangedError);
       dom.lanUploadMessage?.addEventListener("input", onMessageInput);
       dom.lanUploadMessage?.addEventListener("invalid", onMessageInvalid);
       dom.lanUploadClassify?.addEventListener("change", onClassifyChange);
@@ -8804,7 +8928,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
 
   async function onLanShareWatchfaceClick() {
     if (lanShareBusy || lanSyncBusy || !hasLanDeviceHttpTarget() ||
-      toNum(state.config.ClockId, 0) <= 0 || !hasLanUploadChanges()) return;
+      toNum(state.config.ClockId, 0) <= 0 || (!hasLanUploadChanges() && !activeOnlineUploadState())) return;
     if (!state.config.ItemList.length) {
       alert(t("lan.err.emptyItemList"));
       return;
@@ -8824,7 +8948,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     const uploadOptions = await openLanUploadConfirmDialog({
       isUpdate: !!previousUpload,
       previousShareToOthers: previousUpload?.shareToOthers === true,
-      previousClassifyId: previousUpload?.classifyId || 0
+      previousClassifyId: previousUpload?.classifyId || 0,
+      hasContentChanges: hasLanUploadChanges()
     });
     if (!uploadOptions) return;
     lanShareBusy = true;
@@ -9163,9 +9288,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   function refreshTemplateListUi() {
     syncTemplateDomRefs();
     if (!dom.templateList || !dom.templateHint) return;
-    const selectedClassify = getSelectedTemplateClassifyRow();
-    const categoryTemplateIds = selectedClassify ? selectedClassify.availableIds : [];
-    const filtered = [...categoryTemplateIds];
+    const filtered = [...templateState.ids];
 
     dom.templateList.innerHTML = "";
     if (!filtered.length) {
@@ -9226,7 +9349,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       dom.templateHint.textContent = t("template.hint.loading");
     } else if (templateState.error) {
       dom.templateHint.textContent = t("template.hint.error", { message: templateState.error });
-    } else if (selectedClassify && filtered.length) {
+    } else if (filtered.length) {
       dom.templateHint.textContent = t("template.hint.browse", { count: filtered.length });
     } else {
       dom.templateHint.textContent = t("template.hint.empty");
@@ -9285,42 +9408,15 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   async function resolveTemplateConfigIds() {
-    const scanPaths = [
-      withBase("template/config/"),
-      "./template/config/",
-      "template/config/",
-      "./html/template/config/",
-      "../html/template/config/",
-      "/html/template/config/"
-    ];
-
-    for (const p of scanPaths) {
-      try {
-        const txt = await fetchText(p);
-        const ids = parseTemplateIdsFromDirectoryText(txt);
-        if (ids.length) return { ids, source: `${p} (dir)` };
-      } catch (e) {
-        // continue
-      }
+    const catalog = await fetchJson(withBase("template/demo-catalog.json"));
+    if (!Array.isArray(catalog?.ClockList) || !catalog.ClockList.length) {
+      throw new Error("Bundled template catalog is empty");
     }
-
-    let report = null;
-    try {
-      report = await fetchJson(TEMPLATE_ORGANIZE_REPORT_PATH);
-    } catch (e) {
-      // ignore
-    }
-    const reportHints = collectTemplateCandidateIdsFromReport(report);
-    const catalogIds = collectClassifyCatalogClockIds();
-    const spanHints = [...new Set([...reportHints, ...catalogIds])];
-    // 浏览器/Vite 下无法列出目录；若仅用 report 里「缺失」id 算 min，会漏掉 1..(min-1) 等真实存在的 cfg（例如 ClockId 17）。
-    const minCandidate = TEMPLATE_SCAN_MIN_ID;
-    const maxCandidate = spanHints.length
-      ? Math.max(TEMPLATE_SCAN_DEFAULT_MAX_ID, ...spanHints)
-      : TEMPLATE_SCAN_DEFAULT_MAX_ID;
-    const probed = await probeTemplateConfigIds(minCandidate, maxCandidate, TEMPLATE_SCAN_CONCURRENCY);
-    if (probed.length) return { ids: probed, source: "probe" };
-    return { ids: [], source: "none" };
+    bundledTemplateCatalog = catalog;
+    return {
+      ids: [...new Set(catalog.ClockList.map((row) => Number(row.ClockId)).filter((id) => id > 0))],
+      source: "bundled"
+    };
   }
 
   async function loadTemplateConfigIds() {
@@ -9354,6 +9450,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   async function loadTemplateConfigByClockId(clockId) {
     const id = toNum(clockId, NaN);
     if (!Number.isFinite(id)) return null;
+    const bundled = bundledTemplateRow(id);
+    if (bundled) return fetchJson(withBase(bundled.config));
     const paths = [
       `${TEMPLATE_CONFIG_DIR}${id}.cfg`,
       withBase(`template/config/${id}.cfg`),
@@ -9366,6 +9464,15 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   async function loadTemplateBackgroundByClockId(clockId) {
+    if (bundledTemplateRow(clockId)) {
+      const cfg = await loadTemplateConfigByClockId(clockId);
+      const fullSizeLayer = cfg.ItemList.some((item) => Number(item.x) === 0 && Number(item.y) === 0 &&
+        Number(item.w) === 480 && Number(item.h) === 480 && bundledTemplateAssetPath(clockId, item.image_addr));
+      if ((!cfg.DeviceImageUrl || bundledTemplateRow(clockId).unavailableAssets?.includes(cfg.DeviceImageUrl)) && fullSizeLayer) {
+        return { asset: null, path: "", optional: true };
+      }
+      return loadBundledTemplateAsset(clockId, cfg.DeviceImageUrl);
+    }
     const bgFileId = toNum(clockId, 0) + 1;
     return loadFirstTemplateAsset(TEMPLATE_DIR_15, String(bgFileId), TEMPLATE_BG_EXT_CANDIDATES);
   }
@@ -9399,6 +9506,10 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
   }
 
   async function loadTemplateAppPreviewByClockId(clockId, appImageUrl = "") {
+    if (bundledTemplateRow(clockId)) {
+      const cfg = await loadTemplateConfigByClockId(clockId);
+      return loadBundledTemplateAsset(clockId, appImageUrl || cfg.DevicePreviewImageUrl || cfg.DevPreviewSmallImgUrl);
+    }
     const previewFileId = toNum(clockId, 0) + 1;
     const appExt = extFromAssetPath(appImageUrl);
     if (appImageUrl && TEMPLATE_PREVIEW_EXT_CANDIDATES.includes(appExt)) {
@@ -9427,12 +9538,40 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       if (token !== templateState.loadToken) return { aborted: true, total, loaded, missing, unmapped };
       if (!isTemplateImageItem(item)) continue;
       total += 1;
+      if (bundledTemplateRow(id)) {
+        // Empty image addresses are device-rendered placeholders, with no resource to load.
+        if (!String(item.image_addr || "").trim()) {
+          total -= 1;
+          continue;
+        }
+        const result = await loadBundledTemplateAsset(id, item.image_addr);
+        if (token !== templateState.loadToken) {
+          releaseStandaloneAsset(result.asset);
+          return { aborted: true, total, loaded, missing, unmapped };
+        }
+        if (result.asset) {
+          // Persist the bundled bytes with copied designs and include them in exports/uploads.
+          result.asset.fromLocalPick = true;
+          setLocalDispAsset(item, result.asset);
+          item.image_addr = result.asset.name;
+          loaded += 1;
+        } else {
+          missing += 1;
+        }
+        continue;
+      }
       const slot = getTemplateSlotByItem(id, item);
       if (!Number.isFinite(slot) || slot <= 0) {
         unmapped += 1;
         continue;
       }
-      const result = await loadFirstTemplateAsset(TEMPLATE_DIR_29, String(slot), TEMPLATE_IMG_EXT_CANDIDATES);
+      let result = await loadFirstTemplateAsset(TEMPLATE_DIR_29, templateElementAssetStem(slot), TEMPLATE_IMG_EXT_CANDIDATES);
+      if (!result.asset && token === templateState.loadToken) {
+        const legacySlot = legacyTemplateElementSlot(id, item);
+        if (Number.isFinite(legacySlot) && legacySlot > 0) {
+          result = await loadFirstTemplateAsset(TEMPLATE_DIR_29, String(legacySlot), TEMPLATE_IMG_EXT_CANDIDATES);
+        }
+      }
       if (token !== templateState.loadToken) {
         releaseStandaloneAsset(result.asset);
         return { aborted: true, total, loaded, missing, unmapped };
@@ -9506,7 +9645,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
       state.backgroundSourceLabel = rel ? absoluteUrlFromResolvedPath(rel) : "";
     } else {
       state.backgroundSourceLabel = "";
-      summaryParts.push(t("template.resource.bgMissing"));
+      if (!bgResult.optional) summaryParts.push(t("template.resource.bgMissing"));
     }
     refreshBackgroundSourceLabel();
     if (previewResult.asset) {
@@ -10179,6 +10318,8 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
         return pad2(now.getDate());
       case 9:
         return pad2(now.getMonth() + 1);
+      case 535:
+        return ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"][now.getMonth()];
       case 15:
         return now.getHours() >= 12 ? "PM" : "AM";
       case 19:
@@ -11444,6 +11585,7 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     refreshWatchDescFields();
     loadPhotoAlbumDemoImages();
 
+    await loadTemplateConfigIds();
     await ensureBundledStarterWatchfaceIfLibraryEmpty();
 
     const lastId = getLastActiveId();
@@ -11489,8 +11631,6 @@ const DIVOOM_JPEG_GIF_MAX_PREVIEW_FRAMES = 240;
     loadDefaultFontConfigs();
     await loadDispInfoCfg();
     await loadTemplateClassifyCache();
-    await loadTemplateConfigIds();
-    await initPendingTemplateOnStartup();
     await initPendingFontsOnStartup();
     refreshTemplateSyncUi();
     void warnIfFileProtocolBlocked();

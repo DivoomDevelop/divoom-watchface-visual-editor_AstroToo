@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-24T05:59:21.494Z",
+  "generatedAt": "2026-10-19T08:34:23.751Z",
   "sourceFile": "src/editor/app.js (DISP_NAME_MAP)",
   "summary": {
-    "count": 458
+    "count": 508
   },
   "rulesForModels": [
     "disp is the render/driver kind for an item (time slice, image slot, text, etc.).",
@@ -4129,6 +4129,456 @@
       "name": "BATTERY",
       "hints": {
         "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 493,
+      "name": "TIME_ZONE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 494,
+      "name": "EXCHANGE_FLAG_SMALL",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 495,
+      "name": "STOCK_TREND_PIC",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 496,
+      "name": "DYNAMIC_COMPONET",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 497,
+      "name": "AI_EMOJI",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 498,
+      "name": "AI_TEXT",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 499,
+      "name": "NEXT_EVENT_TITLE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 500,
+      "name": "NEXT_EVENT_TIME",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 501,
+      "name": "NEXT_EVENT_REMAINING",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 502,
+      "name": "NEXT_EVENT_COUNTDOWN",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 503,
+      "name": "NEXT_EVENT_COLOR",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 504,
+      "name": "GOOGLE_CALENDAR_HEATMAP",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 505,
+      "name": "AI_BACKGROUD",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 506,
+      "name": "NEXT_EVENT_ACTIVE_MARK",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 507,
+      "name": "TODAY_ACTIVITIES",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 508,
+      "name": "DIAL_SPECIAL_ITEM1",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 510,
+      "name": "DIAL_FOUR_DOT_IMAGE_ITEM1",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 511,
+      "name": "DIAL_FOUR_DOT_IMAGE_ITEM2",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 512,
+      "name": "DIAL_AI_TEXT_ITEM2",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 513,
+      "name": "WORK_MODE_IMAGE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 514,
+      "name": "VOLUME_IMAGE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 515,
+      "name": "WEATHER_PART_IMAGE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 516,
+      "name": "HOT128_IMAGE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 517,
+      "name": "WEBP2_TEXT",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 518,
+      "name": "ALARM_TITLE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 519,
+      "name": "ALARM_COUNTDOWN",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 520,
+      "name": "ALARM_TIME",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 521,
+      "name": "DAILY_SENTENCE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 522,
+      "name": "COUNT_UP_SECOND",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 523,
+      "name": "NEXT_SOLAR_TERM_IMAGE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 524,
+      "name": "NEXT_SOLAR_TERM_COUNTDOWN",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 525,
+      "name": "SPRING_FESTIVAL_COUNTDOWN",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 526,
+      "name": "AMPM_BIG",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 527,
+      "name": "WEBP2_WEATHER",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 528,
+      "name": "WEBP3_WEATHER",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 529,
+      "name": "FOUR_SEASON_IMAGE",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 530,
+      "name": "PHASE_MOON_NAME_EN",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 531,
+      "name": "THREE_MUSIC_WORD",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 532,
+      "name": "POETRY_SHORT",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 533,
+      "name": "HOT_IMAGE_DISP_TIME",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 534,
+      "name": "CALENDAR_WATCH20",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 535,
+      "name": "MONTH_CN_SOLAR",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": true,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 536,
+      "name": "FINANCE_TREND_PIC",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 537,
+      "name": "DAILY_SENTENCE_PIC",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 538,
+      "name": "FULL_SCREEN_LYRICS",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 539,
+      "name": "CALENDAR_WATCH21",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": false,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 540,
+      "name": "TOMMOROW_WEEK_GIF",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 541,
+      "name": "AFTER_TOM_WEEK_GIF",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 542,
+      "name": "THREE_DAY_WEEK_GIF",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
+        "oftenUsesVectorFontForText": false,
+        "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
+      }
+    },
+    {
+      "disp": 543,
+      "name": "FOUR_DAY_WEEK_GIF",
+      "hints": {
+        "likelyUsesRasterOrAssetLayer": true,
         "oftenUsesVectorFontForText": false,
         "note": "Heuristic only; firmware may differ. Validate in editor preview when unsure."
       }

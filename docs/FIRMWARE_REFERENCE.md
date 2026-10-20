@@ -5,10 +5,12 @@
 ## 本地路径（开发机）
 
 ```
-z:\allwinner\TimeFrameSpeaker\tina_t113_v5.0_speaker\platform\thirdparty\gui\lvgl-8\divoom_app1\src
+Z:\allwinner\AstroToo\lichee\rtos\projects\f101s3\astrotoo\src
 ```
 
 环境变量（可选）：`DIVOOM_FIRMWARE_SRC` 可指向上述目录，便于脚本或文档引用。
+
+`npm run sync:disp` 从真机源码同步元素名称、中文说明、图片槽位及帧数规则；`npm run sync:disp -- --check` 只检查差异。可传入其他源码 `src` 目录。图片槽位取头文件枚举值，不取映射表行号；内部上传进度元素不进入选择器。帧数规则来自 `divoom_disp_clock.c`，新增多帧元素时需同步维护脚本中的 `FIRMWARE_FRAME_RULES`。
 
 ## 关键文件
 
@@ -56,7 +58,7 @@ z:\allwinner\TimeFrameSpeaker\tina_t113_v5.0_speaker\platform\thirdparty\gui\lvg
 |------|------|
 | `public/template/config/` | `{ClockId}.cfg` |
 | `public/template/15/` | 底图 `{ClockId+1}.*` |
-| `public/template/29/` | 元素图 `{ClockId*128+offset+1}.*` |
+| `public/template/29/` | 新元素图 `astrotoo-{ClockId*256+offset+1}.*`，offset 来自 `divoom_disp_clock.h` 的图片槽位枚举；仍可读取旧版数字文件名的 128 槽缓存 |
 | `public/template/33/` | 预览 `{ClockId+1}.*` |
 | `public/font/font_info.cfg` | `FontList[]`：`id`, `type`, `url`, `charset`, `name` |
 | `public/font/` | 字体文件 `(fontId+1).bin`（TTF/OTF/图像字体均用此名） |

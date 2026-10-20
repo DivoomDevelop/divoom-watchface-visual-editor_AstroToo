@@ -18,6 +18,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Verify bundled template snapshot
+        run: node scripts/bundle-demo-templates.mjs --check
       - name: Prepare Windows signing certificate
         shell: pwsh
         env:
@@ -50,6 +52,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Verify bundled template snapshot
+        run: node scripts/bundle-demo-templates.mjs --check
       - name: Make signed and notarized macOS DMG
         env:
           CSC_LINK: ${{ secrets.APPLE_CERT_P12_BASE64 }}

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * Sync DISP_NAME_MAP, DISP_COMMENT_ZH_MAP, TEMPLATE_DISP_OFFSET_TABLE, IMAGE_DISP_IDS
- * from LvglAstroTooSimulator sources into src/editor/app.js.
+ * from AstroToo firmware sources into src/editor/app.js.
+ * The historical filename and explicit simulator-source argument remain supported.
  *
  * Usage:
- *   node scripts/sync-disp-from-simulator.mjs [path-to-simulator-src]
+ *   npm run sync:disp -- [path-to-firmware-src] [--check]
  *
- * Default simulator src:
- *   ../../divoom_product/timebox/trunck/device/tool_src/lv_sim_visual_studio/LvglAstroTooSimulator/src
+ * Source: DIVOOM_FIRMWARE_SRC or the local AstroToo firmware checkout.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -15,15 +15,11 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const DEFAULT_SIM_SRC =
-  "D:/work/divoom_product/timebox/trunck/device/tool_src/lv_sim_visual_studio/LvglAstroTooSimulator/src";
-
-const simSrc = path.resolve(process.argv[2] || DEFAULT_SIM_SRC);
-const headerPath = path.join(simSrc, "divoom_light/include/divoom_disp_clock.h");
-const managePath = path.join(simSrc, "middle/divoom_clock_manage.c");
+const DEFAULT_FIRMWARE_SRC =
+  "Z:/allwinner/AstroToo/lichee/rtos/projects/f101s3/astrotoo/src";
 const appJsPath = path.join(ROOT, "src/editor/app.js");
 
-function parseDispEnum(header) {
+export function parseDispEnum(header) {
   const entries = new Map();
   const re =
     /DIVOOM_CLOCK_DISP_SUPPORT_([A-Z0-9_]+)\s*=\s*(\d+)\s*,\s*(?:\/\/(.*))?/g;
@@ -40,29 +36,37 @@ function parseDispEnum(header) {
   return entries;
 }
 
-function parseOffsetTable(manageSrc, simEntriesBySuffix) {
+export function parseOffsetTable(manageSrc, entriesBySuffix, header) {
+  // Firmware uses the first column's enum value, not the row's position.
+  // Rows can be reordered, omit slots, or share one slot (461 and 523).
+  const enumBlock = [...header.matchAll(/enum\s*\{([\s\S]*?)\};/g)]
+    .find((match) => /\bDIVOOM_DISP_CLOCK_IMAGE_OFFSET_/.test(match[1]));
+  if (!enumBlock) throw new Error("Image offset enum not found");
+  const offsets = new Map();
+  let nextOffset = 0;
+  const enumBody = enumBlock[1].replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\r\n]*/g, "");
+  for (const raw of enumBody.split(",")) {
+    if (!raw.trim()) continue;
+    const entry = raw.trim().match(/^(DIVOOM_DISP_CLOCK_IMAGE_OFFSET_[A-Z0-9_]+)(?:\s*=\s*(0x[\da-f]+|\d+))?$/i);
+    if (!entry) throw new Error(`Unsupported image offset enum: ${raw.trim()}`);
+    const value = entry[2] == null ? nextOffset : Number(entry[2]);
+    offsets.set(entry[1], value);
+    nextOffset = value + 1;
+  }
   const table = new Map();
   const blockMatch = manageSrc.match(
     /const int gdivoom_disp_image_item_table\[\]\[2\]\s*=\s*\{([\s\S]*?)\};/
   );
   if (!blockMatch) throw new Error("gdivoom_disp_image_item_table not found");
-  const rows = blockMatch[1].match(/\{[^}]+\}/g) || [];
-  let offset = 0;
+  const rows = blockMatch[1].replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\r\n]*/g, "").match(/\{[^}]+\}/g) || [];
   for (const row of rows) {
-    const cols = [...row.matchAll(/DIVOOM_[A-Z0-9_]+/g)].map((x) => x[0]);
-    if (cols.length < 2) continue;
-    const dispToken = cols[1];
-    const dispMatch = dispToken.match(/DIVOOM_CLOCK_DISP_SUPPORT_(.+)/);
-    if (!dispMatch) continue;
-    const dispName = dispMatch[1];
-    if (dispName === "0" || row.includes(",    0}")) {
-      offset++;
-      continue;
-    }
-    const entry = simEntriesBySuffix.get(dispName);
-    if (!entry) continue;
+    const cols = row.match(/^\{\s*(DIVOOM_DISP_CLOCK_IMAGE_OFFSET_[A-Z0-9_]+)\s*,\s*(DIVOOM_CLOCK_DISP_SUPPORT_[A-Z0-9_]+|0)\s*\}$/);
+    if (!cols) throw new Error(`Unsupported image mapping: ${row}`);
+    if (cols[2] === "0") continue; // Background is not a selectable element.
+    const entry = entriesBySuffix.get(cols[2].replace("DIVOOM_CLOCK_DISP_SUPPORT_", ""));
+    const offset = offsets.get(cols[1]);
+    if (!entry || offset == null) throw new Error(`Unresolved image mapping: ${row}`);
     table.set(entry.id, offset);
-    offset++;
   }
   return table;
 }
@@ -84,7 +88,7 @@ function readExistingMap(appSrc, constName) {
         const map = new Map();
         const re = /^\s*(\d+)\s*:\s*"((?:\\.|[^"\\])*)"/gm;
         let m;
-        while ((m = re.exec(body))) map.set(Number(m[1]), m[2]);
+        while ((m = re.exec(body))) map.set(Number(m[1]), JSON.parse(`"${m[2]}"`));
         return map;
       }
     }
@@ -207,6 +211,13 @@ const FIRMWARE_FRAME_RULES = new Map([
   [483, { mode: "multiple", value: 10 }],
   [484, { mode: "multiple", value: 10 }],
   [492, { mode: "multiple", value: 10 }],
+  [495, { mode: "multiple", value: 4 }],
+  [536, { mode: "multiple", value: 2 }],
+  [537, { mode: "multiple", value: 30 }],
+  [540, { mode: "multiple", value: 7 }],
+  [541, { mode: "multiple", value: 7 }],
+  [542, { mode: "multiple", value: 7 }],
+  [543, { mode: "multiple", value: 7 }],
   [281, { mode: "multiple", value: 10 }],
   [282, { mode: "multiple", value: 10 }],
   [283, { mode: "multiple", value: 10 }],
@@ -224,17 +235,25 @@ const FIRMWARE_FRAME_RULES = new Map([
 ]);
 
 function main() {
+  const args = process.argv.slice(2);
+  const sourceDir = path.resolve(args.find((arg) => arg !== "--check") || process.env.DIVOOM_FIRMWARE_SRC || DEFAULT_FIRMWARE_SRC);
+  const headerPath = path.join(sourceDir, "divoom_light/include/divoom_disp_clock.h");
+  const managePath = path.join(sourceDir, "middle/divoom_clock_manage.c");
+  const configPath = path.join(sourceDir, "middle/include/divoom.h");
   if (!fs.existsSync(headerPath)) throw new Error(`Missing ${headerPath}`);
   if (!fs.existsSync(managePath)) throw new Error(`Missing ${managePath}`);
   if (!fs.existsSync(appJsPath)) throw new Error(`Missing ${appJsPath}`);
 
   const header = fs.readFileSync(headerPath, "utf8");
   const manageSrc = fs.readFileSync(managePath, "utf8");
+  const configSrc = fs.readFileSync(configPath, "utf8");
+  const slotCount = Number(configSrc.match(/^\s*#define\s+DIVOOM_DEVICE_CLOCK_CUSTOME_MAX_IMAGE\s+(\d+)/m)?.[1]);
+  if (!Number.isSafeInteger(slotCount) || slotCount <= 0) throw new Error("Invalid firmware image slot count");
   let appSrc = fs.readFileSync(appJsPath, "utf8");
 
   const simEntries = parseDispEnum(header);
   const simEntriesBySuffix = new Map([...simEntries.values()].map((e) => [e.suffix, e]));
-  const offsetTable = parseOffsetTable(manageSrc, simEntriesBySuffix);
+  const offsetTable = parseOffsetTable(manageSrc, simEntriesBySuffix, header);
   const imageDispIds = new Set(offsetTable.keys());
 
   const nameMap = readExistingMap(appSrc, "DISP_NAME_MAP");
@@ -252,7 +271,7 @@ function main() {
   let addedNames = 0;
   let addedComments = 0;
   for (const [id, entry] of simEntries) {
-    if (/^(SET_START_ID|SET_END_ID|END_NUM_INFO|DAIL_COMPONENT_START_ID|DAIL_COMPONENT_END_ID)$/.test(entry.suffix)) {
+    if (/^(SET_START_ID|SET_END_ID|END_NUM_INFO|DAIL_COMPONENT_START_ID|DAIL_COMPONENT_END_ID|HTTP_UPLOAD_PROGRESS)$/.test(entry.suffix)) {
       continue;
     }
     if (!nameMap.has(id)) {
@@ -289,16 +308,27 @@ function main() {
   pointerIds.add(390);
   pointerIds.add(391);
   appOut = replaceBlock(appOut, "POINTER_DISP_IDS", "set", formatSet(pointerIds));
+  appOut = appOut.replace(/const TEMPLATE_IMAGE_SLOT_COUNT = \d+;/, `const TEMPLATE_IMAGE_SLOT_COUNT = ${slotCount};`);
 
-  fs.writeFileSync(appJsPath, appOut, "utf8");
+  appOut = appOut.replace(/\r?\n/g, appSrc.includes("\r\n") ? "\r\n" : "\n");
+  const changed = appOut !== appSrc;
+  if (!args.includes("--check") && changed) {
+    if (fs.readFileSync(appJsPath, "utf8") !== appSrc) {
+      throw new Error("app.js changed during sync; rerun to preserve concurrent edits");
+    }
+    fs.writeFileSync(appJsPath, appOut, "utf8");
+  }
 
-  console.log(`Simulator disp enum: ${simEntries.size}`);
+  console.log(`Firmware source: ${sourceDir}`);
+  console.log(`Firmware disp enum: ${simEntries.size}`);
+  console.log(`Image slots per watchface: ${slotCount}`);
   console.log(`Added DISP_NAME_MAP entries: ${addedNames}`);
   console.log(`Added DISP_COMMENT_ZH_MAP entries: ${addedComments}`);
   console.log(`IMAGE_DISP_IDS: ${imageIds.size}`);
   console.log(`TEMPLATE_DISP_OFFSET_TABLE: ${offsetMap.size}`);
   console.log(`LOCAL_ASSET_DISP_RULES: ${rules.size}`);
-  console.log(`Updated ${path.relative(ROOT, appJsPath)}`);
+  console.log(`${changed ? (args.includes("--check") ? "Needs sync:" : "Updated") : "Already synced:"} ${path.relative(ROOT, appJsPath)}`);
+  if (args.includes("--check") && changed) process.exitCode = 1;
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -12,6 +12,8 @@ test("desktop paths only expose the intended assets and LAN targets", () => {
   assert.throws(() => writablePath("template/config/evil.html"));
   assert.equal(writablePath("disp/disp_info.cfg"), "disp/disp_info.cfg");
   assert.equal(writablePath("template/33/2416.app.webp"), "template/33/2416.app.webp");
+  assert.equal(writablePath("template/29/astrotoo-2561.bin"), "template/29/astrotoo-2561.bin");
+  assert.throws(() => writablePath("template/15/astrotoo-2561.bin"));
   assert.equal(resolveLanTarget("http://192.168.1.8:9000"), "http://192.168.1.8:9000");
   assert.throws(() => resolveLanTarget("http://example.com:9000"));
   assert.throws(() => resolveLanTarget("http://192.168.1.8:8080"));
@@ -51,6 +53,10 @@ test("bundled assets, downloaded overrides, deletion, and proxy requests work", 
   assert.equal(await response.text(), '{"new":true}');
   response = await write("disp/disp_info.cfg", '{"disp":1}');
   assert.equal(response.status, 200);
+  response = await write("template/29/astrotoo-2561.bin", 'image bytes');
+  assert.equal(response.status, 200);
+  response = await route(new Request("astrotoo://app/template/29/astrotoo-2561.bin"));
+  assert.equal(await response.text(), 'image bytes');
 
   response = await route(new Request("astrotoo://app/api/template-sync/delete", {
     method: "POST", body: JSON.stringify({ relPath: "font/font_info.cfg" })
