@@ -1,0 +1,70 @@
+name: Publish verified desktop test installers
+
+on:
+  push:
+    branches: [codex/desktop-build-*]
+    paths: [.github/workflows/desktop-publish-artifacts.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+env:
+  SOURCE_RUN: "39401652639"
+  SOURCE_SHA: "02a91418dc551526f011917f3b5c6c38ba3236d9"
+  RELEASE_TAG: desktop-test-20261020
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the source build
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" > source-run.json
+          jq -e --arg sha "$SOURCE_SHA" '.conclusion == "success" and .head_sha == $sha' source-run.json
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN }}
+          pattern: astrotoo-*
+          path: artifacts
+      - name: Publish the verified installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir distribution
+          cp artifacts/astrotoo-windows-x64-test/*-win-x64-setup.exe distribution/
+          cp artifacts/astrotoo-macos-arm64-adhoc-test/*-mac-arm64.dmg distribution/
+          cp artifacts/astrotoo-macos-x64-adhoc-test/*-mac-x64.dmg distribution/
+          test "$(find distribution -type f | wc -l)" -eq 3
+          (cd distribution && sha256sum *.exe *.dmg > SHA256SUMS.txt)
+          cat > release-notes.md <<'NOTES'
+          ## AstroToo Studio 0.1.1 — build 14 test installers
+
+          - Windows x64: download the `.exe` installer.
+          - Mac with Apple silicon: download `mac-arm64.dmg`.
+          - Mac with an Intel processor: download `mac-x64.dmg`.
+          - All three installers include 16 built-in watchface templates and their 127 resource files. No separate template download is required.
+          - Source build: 02a91418dc551526f011917f3b5c6c38ba3236d9. Build, resource-integrity checks, and regression checks passed.
+          - Test signing: Windows is unsigned; macOS is ad-hoc signed and has not been Apple-notarized.
+          - `SHA256SUMS.txt` contains checksums for all three installers.
+
+          ## 中文下载说明
+
+          Windows 下载 `.exe`；苹果芯片 Mac 下载 `arm64.dmg`；Intel Mac 下载 `x64.dmg`。
+          安装包已内置 16 个模板及其资源，无需另外下载模板。此版本为测试版本，Mac 使用临时签名，未做 Apple 公证。
+          NOTES
+          if gh release view "$RELEASE_TAG" --json isDraft,targetCommitish > existing-release.json 2>/dev/null; then
+            jq -e --arg sha "$SOURCE_SHA" '.isDraft == true and .targetCommitish == $sha' existing-release.json
+          else
+            gh release create "$RELEASE_TAG" --draft --prerelease --target "$SOURCE_SHA" \
+              --title "AstroToo Studio 0.1.1 — build 14 test installers" --notes-file release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" distribution/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          gh release view "$RELEASE_TAG" --json url,assets
